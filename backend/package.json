@@ -1,0 +1,20 @@
+{
+  "name": "trendforge-backend",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "build": "node --check server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "ioredis": "^5.4.1",
+    "pg": "^8.13.0",
+    "@electric-sql/pglite": "^0.2.0",
+    "@langchain/langgraph": "^0.2.0",
+    "@langchain/anthropic": "^0.3.0",
+    "@langchain/core": "^0.3.0"
+  }
+}
