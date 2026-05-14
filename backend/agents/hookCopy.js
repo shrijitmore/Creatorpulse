@@ -1,91 +1,70 @@
-import { ChatAnthropic } from '@langchain/anthropic'
-import { MOCK_CONTENT_KIT } from '../mockData.js'
+import { createGeminiModel, hasGeminiCredentials, extractJson } from '../lib/gemini.js'
 
 /**
  * Agent 4 — Hook & Copy Generator
- * Uses Claude to generate the full content kit: hook variants, caption, hashtags, thumbnail text.
- * Falls back to mock content kit if ANTHROPIC_API_KEY is not set.
+ * Generates hook variants, caption, hashtags, thumbnail text via Gemini.
  */
 export async function generateCopyKit(script, topicTitle, niche) {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.log('[hookCopy] No ANTHROPIC_API_KEY — returning mock content kit')
-    return MOCK_CONTENT_KIT
+  if (!hasGeminiCredentials()) {
+    throw new Error('Gemini credentials not configured. Set GOOGLE_SERVICE_ACCOUNT_JSON in backend/.env')
   }
 
-  try {
-    const model = new ChatAnthropic({
-      model: 'claude-sonnet-4-20250514',
-      temperature: 0.8,
-      maxTokens: 2000,
-      apiKey: process.env.ANTHROPIC_API_KEY
-    })
+  const model = createGeminiModel({ temperature: 0.8, maxOutputTokens: 2000 })
 
-    const scriptSummary = `
-Topic: ${topicTitle}
+  const scriptSummary = `Topic: ${topicTitle}
 Hook: ${script.hookLine}
 Tone: ${script.tone}
 Format: ${script.format}
 Key scenes: ${script.scenes.map(s => s.voiceover).join(' | ')}
-CTA: ${script.cta}
-`.trim()
+CTA: ${script.cta}`.trim()
 
-    const prompt = `You are a social media copywriter specializing in viral Instagram Reels content for ${niche} creators.
+  const prompt = `You are a social media copywriter specializing in viral Instagram Reels for ${niche} creators.
 
 Given this reel script about "${topicTitle}":
 
 ${scriptSummary}
 
-Generate a complete content kit. Return ONLY valid JSON (no markdown, no explanation):
+Generate a complete content kit. Return ONLY valid JSON, no markdown:
 
 {
   "hookVariants": [
-    "curiosity hook — create an information gap, make them wonder what happens next",
-    "bold claim hook — make a strong, specific, surprising claim that demands attention",
-    "question hook — ask a question the target audience can NOT ignore"
+    "curiosity hook — create an information gap",
+    "bold claim hook — strong, specific, surprising claim",
+    "question hook — question the audience cannot ignore"
   ],
-  "caption": "Full Instagram caption with emojis, line breaks for readability. Include a story/value element (3-4 lines), a list of key takeaways or benefits (3-5 bullet points with emojis), and an engagement CTA at the end. 150-200 words total. Make it feel authentic, not corporate.",
+  "caption": "Full Instagram caption with emojis and line breaks. Story/value element (3-4 lines), bullet takeaways (3-5 with emojis), engagement CTA. 150-200 words. Authentic voice.",
   "hashtags": {
-    "niche": ["5 highly specific hashtags for the ${niche} niche — medium competition"],
-    "trending": ["5 currently relevant/trending hashtags related to this topic"],
-    "broad": ["8-10 broad reach hashtags that reach a wider audience"]
+    "niche": ["5 specific ${niche} hashtags — medium competition"],
+    "trending": ["5 currently relevant trending hashtags"],
+    "broad": ["8-10 broad reach hashtags"]
   },
-  "thumbnailText": "BOLD 3-6 WORD TEXT OVERLAY IN ALL CAPS — should make someone stop scrolling in the feed preview"
+  "thumbnailText": "BOLD 3-6 WORD OVERLAY IN ALL CAPS"
 }
 
 Rules:
-- hookVariants: each must be under 15 words, punchy, scroll-stopping
-- caption: use actual line breaks (\\n), authentic voice, NOT generic
-- hashtags: include the # symbol, realistic and relevant
-- thumbnailText: ALL CAPS, 3-6 words maximum, create curiosity or bold claim`
+- hookVariants: under 15 words each, punchy, scroll-stopping
+- caption: real line breaks (\\n), authentic not corporate
+- hashtags: include # symbol
+- thumbnailText: ALL CAPS, 3-6 words max`
 
-    const response = await model.invoke(prompt)
-    const content = response.content
+  const response = await model.invoke(prompt)
+  const content = typeof response.content === 'string' ? response.content : JSON.stringify(response.content)
+  const parsed = extractJson(content)
 
-    const jsonMatch = content.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      throw new Error('No valid JSON in Claude response')
-    }
+  if (!parsed.hookVariants || !parsed.caption || !parsed.hashtags) {
+    throw new Error('Invalid content kit structure from Gemini')
+  }
 
-    const parsed = JSON.parse(jsonMatch[0])
+  console.log(`[hookCopy] Generated content kit for "${topicTitle}"`)
 
-    if (!parsed.hookVariants || !parsed.caption || !parsed.hashtags) {
-      throw new Error('Invalid content kit structure from Claude')
-    }
-
-    console.log(`[hookCopy] Generated content kit for "${topicTitle}"`)
-
-    return {
-      hookVariants: parsed.hookVariants,
-      caption: parsed.caption,
-      hashtags: {
-        niche: parsed.hashtags.niche || [],
-        trending: parsed.hashtags.trending || [],
-        broad: parsed.hashtags.broad || []
-      },
-      thumbnailText: parsed.thumbnailText || topicTitle.toUpperCase().slice(0, 30)
-    }
-  } catch (err) {
-    console.error('[hookCopy] Claude error, falling back to mock:', err.message)
-    return MOCK_CONTENT_KIT
+  return {
+    hookVariants: parsed.hookVariants,
+    caption: parsed.caption,
+    hashtags: {
+      niche: parsed.hashtags.niche || [],
+      trending: parsed.hashtags.trending || [],
+      broad: parsed.hashtags.broad || []
+    },
+    thumbnailText: parsed.thumbnailText || topicTitle.toUpperCase().slice(0, 30)
   }
 }

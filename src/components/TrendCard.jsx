@@ -71,40 +71,41 @@ export default function TrendCard({ trend, index = 0, featured = false }) {
   const signal = SIGNAL_CONFIG[trend.signal] || SIGNAL_CONFIG.new
 
   const handleGenerate = () => {
-    navigate(`/studio?topicId=${trend.id}&title=${encodeURIComponent(trend.title)}`)
+    navigate(`/studio?topicId=${trend.id}&title=${encodeURIComponent(trend.title)}&niche=${encodeURIComponent(trend.niche || '')}`)
+  }
+
+  // Featured gradient border: use a pseudo-wrapper instead of conflicting background shorthands
+  const featuredBorderStyle = featured ? {
+    padding: '1px',
+    backgroundImage: 'linear-gradient(135deg, #BFFF00, #00D1FF)',
+    borderRadius: '8px',
+    boxShadow: hovering ? '0 0 24px rgba(191,255,0,0.12)' : '0 0 20px rgba(0,209,255,0.05)',
+  } : {}
+
+  const innerStyle = featured ? {
+    backgroundColor: hovering ? 'rgba(255,255,255,0.06)' : 'rgba(8,9,13,0.97)',
+    borderRadius: '7px',
+    border: 'none',
+  } : {
+    backgroundColor: hovering ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
+    border: hovering ? '1px solid rgba(255,255,255,0.14)' : '1px solid rgba(255,255,255,0.07)',
+    borderRadius: '8px',
+    boxShadow: hovering ? '0 0 24px rgba(191,255,0,0.06), inset 0 1px 0 rgba(255,255,255,0.08)' : 'none',
   }
 
   return (
     <div
-      className="fade-up relative flex flex-col rounded-lg cursor-default"
+      className="fade-up relative flex flex-col cursor-default"
       style={{
         animationDelay: `${0.05 * index}s`,
-        background: hovering
-          ? 'rgba(255,255,255,0.06)'
-          : featured
-            ? 'rgba(255,255,255,0.05)'
-            : 'rgba(255,255,255,0.03)',
-        border: featured
-          ? '1px solid transparent'
-          : hovering
-            ? '1px solid rgba(255,255,255,0.14)'
-            : '1px solid rgba(255,255,255,0.07)',
-        backgroundImage: featured
-          ? 'linear-gradient(rgba(8,9,13,0.95), rgba(8,9,13,0.95)), linear-gradient(135deg, #BFFF00, #00D1FF)'
-          : 'none',
-        backgroundOrigin: featured ? 'border-box' : 'padding-box',
-        backgroundClip: featured ? 'padding-box, border-box' : 'padding-box',
-        boxShadow: hovering
-          ? '0 0 24px rgba(191,255,0,0.06), inset 0 1px 0 rgba(255,255,255,0.08)'
-          : featured
-            ? '0 0 20px rgba(0,209,255,0.05)'
-            : 'none',
+        minHeight: '280px',
         transition: 'all 0.2s ease',
-        minHeight: '280px'
+        ...featuredBorderStyle
       }}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
     >
+    <div className="relative flex flex-col flex-1" style={{ ...innerStyle, minHeight: featured ? 'calc(280px - 2px)' : undefined }}>
       {featured && (
         <div
           className="absolute -top-px left-4 px-2 py-0.5 text-xs font-mono font-medium"
@@ -232,6 +233,7 @@ export default function TrendCard({ trend, index = 0, featured = false }) {
           <ArrowRight size={14} />
         </button>
       </div>
+    </div>
     </div>
   )
 }

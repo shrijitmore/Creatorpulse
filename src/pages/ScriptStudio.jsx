@@ -5,7 +5,6 @@ import AgentProgress from '../components/AgentProgress.jsx'
 import ScriptPanel from '../components/ScriptPanel.jsx'
 import ContentKitPanel from '../components/ContentKitPanel.jsx'
 import { useScriptGeneration } from '../hooks/useScriptGeneration.js'
-import { saveScript } from '../lib/api.js'
 
 const TONES = [
   { id: 'educational', label: 'Educational' },
@@ -26,11 +25,11 @@ export default function ScriptStudio() {
 
   const topicId = searchParams.get('topicId') || ''
   const topicTitle = searchParams.get('title') ? decodeURIComponent(searchParams.get('title')) : ''
+  const topicNiche = searchParams.get('niche') ? decodeURIComponent(searchParams.get('niche')) : 'general'
 
   const [tone, setTone] = useState('storytelling')
   const [format, setFormat] = useState('60s')
   const [saved, setSaved] = useState(false)
-  const [saveError, setSaveError] = useState('')
   const [activeTab, setActiveTab] = useState('script') // for mobile
 
   const {
@@ -48,32 +47,22 @@ export default function ScriptStudio() {
   // Auto-generate when topicId is available and no script yet
   useEffect(() => {
     if (topicId && !script && !isGenerating) {
-      generate(topicId, tone, format)
+      generate(topicId, topicTitle, topicNiche, tone, format)
     }
   }, []) // Only on mount
 
   const handleGenerate = () => {
     if (!topicId) return
     setSaved(false)
-    generate(topicId, tone, format)
+    generate(topicId, topicTitle, topicNiche, tone, format)
   }
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!script) return
-    setSaveError('')
-    try {
-      await saveScript({
-        topicTitle: script.topicTitle || topicTitle,
-        niche: script.niche || 'general',
-        format,
-        tone,
-        platform: script.platform || 'instagram'
-      })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 3000)
-    } catch (err) {
-      setSaveError('Failed to save script')
-    }
+    // Script is persisted to DB automatically during generation.
+    // This button just confirms to the user it's already saved.
+    setSaved(true)
+    setTimeout(() => setSaved(false), 3000)
   }
 
   // If no topicId, show topic selector
@@ -244,19 +233,7 @@ export default function ScriptStudio() {
         </div>
       )}
 
-      {/* Save error */}
-      {saveError && (
-        <div
-          className="mx-6 mt-3 px-3 py-2 rounded text-xs font-mono"
-          style={{
-            background: 'rgba(255,61,113,0.08)',
-            border: '1px solid rgba(255,61,113,0.2)',
-            color: '#FF3D71'
-          }}
-        >
-          {saveError}
-        </div>
-      )}
+
 
       {/* Error state */}
       {error && !isGenerating && (

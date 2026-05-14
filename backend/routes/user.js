@@ -12,8 +12,8 @@ const HARDCODED_USER = {
 // Track niches in memory as fallback (updated by PATCH)
 let currentNiches = ['fitness', 'tech']
 
-// POST /api/auth/login
-router.post('/auth/login', async (req, res) => {
+// POST /api/auth/login  →  mounted at /api/auth so path = /login
+router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body
 
@@ -58,8 +58,8 @@ router.post('/auth/login', async (req, res) => {
   }
 })
 
-// GET /api/auth/me
-router.get('/auth/me', async (req, res) => {
+// GET /api/auth/me  →  mounted at /api/auth so path = /me
+router.get('/me', async (req, res) => {
   try {
     let niches = currentNiches
     try {

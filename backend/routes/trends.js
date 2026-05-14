@@ -1,20 +1,8 @@
 import { Router } from 'express'
 import { runTrendPipeline } from '../agents/pipeline.js'
-import { MOCK_TRENDS, MOCK_RECOMMENDATIONS } from '../mockData.js'
 
 const router = Router()
 
-// Detect mock mode
-function isMockMode() {
-  if (process.env.MOCK_MODE === 'true') return true
-  const hasAnyKey =
-    process.env.ANTHROPIC_API_KEY ||
-    process.env.APIFY_API_KEY ||
-    process.env.RAPIDAPI_KEY
-  return !hasAnyKey
-}
-
-// Build cache key
 function cacheKey(niches, platforms) {
   const n = (niches || []).slice().sort().join(',')
   const p = (platforms || []).slice().sort().join(',')
@@ -27,32 +15,15 @@ router.get('/', async (req, res) => {
     const niches = req.query.niches ? req.query.niches.split(',').map(s => s.trim()).filter(Boolean) : []
     const platforms = req.query.platforms ? req.query.platforms.split(',').map(s => s.trim()).filter(Boolean) : []
 
-    // Mock mode
-    if (isMockMode()) {
-      return res.json({
-        success: true,
-        data: {
-          trends: MOCK_TRENDS,
-          recommendations: MOCK_RECOMMENDATIONS
-        },
-        meta: { mode: 'mock', processingMs: 0 }
-      })
-    }
-
     const redis = req.app.locals.redis
     const key = cacheKey(niches, platforms)
 
-    // Check Redis cache
     if (redis) {
       try {
         const cached = await redis.get(key)
         if (cached) {
           console.log(`[trends] Cache hit: ${key}`)
-          return res.json({
-            success: true,
-            data: JSON.parse(cached),
-            meta: { mode: 'live', cached: true, processingMs: 0 }
-          })
+          return res.json({ success: true, data: JSON.parse(cached), meta: { cached: true, processingMs: 0 } })
         }
       } catch (cacheErr) {
         console.error('[trends] Redis get error:', cacheErr.message)
@@ -62,10 +33,8 @@ router.get('/', async (req, res) => {
     const start = Date.now()
     const { trends, recommendations } = await runTrendPipeline(niches, platforms)
     const processingMs = Date.now() - start
-
     const result = { trends, recommendations }
 
-    // Cache result
     if (redis) {
       try {
         await redis.set(key, JSON.stringify(result), 'EX', 7200)
@@ -75,17 +44,10 @@ router.get('/', async (req, res) => {
       }
     }
 
-    res.json({
-      success: true,
-      data: result,
-      meta: { mode: 'live', cached: false, processingMs }
-    })
+    res.json({ success: true, data: result, meta: { cached: false, processingMs } })
   } catch (err) {
     console.error('[trends GET] Error:', err)
-    res.status(500).json({
-      success: false,
-      error: { code: 'TRENDS_ERROR', message: err.message || 'Failed to fetch trends' }
-    })
+    res.status(500).json({ success: false, error: { code: 'TRENDS_ERROR', message: err.message || 'Failed to fetch trends' } })
   }
 })
 
@@ -93,10 +55,8 @@ router.get('/', async (req, res) => {
 router.post('/refresh', async (req, res) => {
   try {
     const { niches = [], platforms = [] } = req.body
-
     const redis = req.app.locals.redis
 
-    // Invalidate cache
     if (redis) {
       try {
         const key = cacheKey(niches, platforms)
@@ -107,25 +67,11 @@ router.post('/refresh', async (req, res) => {
       }
     }
 
-    // Mock mode
-    if (isMockMode()) {
-      return res.json({
-        success: true,
-        data: {
-          trends: MOCK_TRENDS,
-          recommendations: MOCK_RECOMMENDATIONS
-        },
-        meta: { mode: 'mock', refreshed: true }
-      })
-    }
-
     const start = Date.now()
     const { trends, recommendations } = await runTrendPipeline(niches, platforms)
     const processingMs = Date.now() - start
-
     const result = { trends, recommendations }
 
-    // Re-cache
     if (redis) {
       try {
         const key = cacheKey(niches, platforms)
@@ -135,17 +81,10 @@ router.post('/refresh', async (req, res) => {
       }
     }
 
-    res.json({
-      success: true,
-      data: result,
-      meta: { mode: 'live', refreshed: true, processingMs }
-    })
+    res.json({ success: true, data: result, meta: { refreshed: true, processingMs } })
   } catch (err) {
     console.error('[trends POST /refresh] Error:', err)
-    res.status(500).json({
-      success: false,
-      error: { code: 'REFRESH_ERROR', message: err.message || 'Failed to refresh trends' }
-    })
+    res.status(500).json({ success: false, error: { code: 'REFRESH_ERROR', message: err.message || 'Failed to refresh trends' } })
   }
 })
 

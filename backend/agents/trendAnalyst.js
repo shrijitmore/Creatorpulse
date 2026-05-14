@@ -1,31 +1,22 @@
-import { ChatAnthropic } from '@langchain/anthropic'
-import { MOCK_TRENDS, MOCK_RECOMMENDATIONS } from '../mockData.js'
+import { createGeminiModel, hasGeminiCredentials, extractJson } from '../lib/gemini.js'
 
 /**
  * Agent 2 — Trend Analyst
- * Uses Claude to analyze raw trend data, score virality, and pick recommendations.
- * Falls back to mock data if ANTHROPIC_API_KEY is not set.
+ * Scores virality, deduplicates, picks top 3 recommendations.
  */
 export async function analyzeTrends(rawTrends, niches) {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.log('[trendAnalyst] No ANTHROPIC_API_KEY — returning mock analyzed trends')
-    return {
-      trends: MOCK_TRENDS,
-      recommendations: MOCK_RECOMMENDATIONS
-    }
+  if (!rawTrends || rawTrends.length === 0) {
+    throw new Error('No trend data to analyze — scrapers returned empty results')
   }
 
-  try {
-    const model = new ChatAnthropic({
-      model: 'claude-sonnet-4-20250514',
-      temperature: 0.3,
-      maxTokens: 4096,
-      apiKey: process.env.ANTHROPIC_API_KEY
-    })
+  if (!hasGeminiCredentials()) {
+    throw new Error('Gemini credentials not configured. Set GOOGLE_SERVICE_ACCOUNT_JSON in backend/.env')
+  }
 
-    const trendsJson = JSON.stringify(rawTrends, null, 2)
+  const model = createGeminiModel({ temperature: 0.3, maxOutputTokens: 4096 })
+  const trendsJson = JSON.stringify(rawTrends, null, 2)
 
-    const prompt = `You are a social media trend analyst specializing in content virality prediction.
+  const prompt = `You are a social media trend analyst specializing in content virality prediction.
 
 Given this list of trending topics from social media, analyze each one and return a JSON object.
 
@@ -44,42 +35,28 @@ For each trend, determine:
 - niche: detected content niche (fitness, finance, tech, lifestyle, food, beauty, gaming, travel, etc.)
 - createdAt: keep original or use current ISO timestamp
 
-Also identify the top 3 trends by score as "recommendations" (best content opportunities).
+Also identify the top 3 trends by score as "recommendations".
 
-Return ONLY valid JSON in this exact format:
+Return ONLY valid JSON:
 {
-  "trends": [...array of all analyzed trend objects...],
-  "recommendations": [...array of top 3 trend objects...]
+  "trends": [...],
+  "recommendations": [...top 3 trend objects...]
 }
 
-Do not include any explanation or markdown. Return raw JSON only.`
+No markdown, no explanation. Raw JSON only.`
 
-    const response = await model.invoke(prompt)
-    const content = response.content
+  const response = await model.invoke(prompt)
+  const content = typeof response.content === 'string' ? response.content : JSON.stringify(response.content)
+  const parsed = extractJson(content)
 
-    // Extract JSON from response
-    const jsonMatch = content.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      throw new Error('No valid JSON in Claude response')
-    }
+  if (!parsed.trends || !Array.isArray(parsed.trends)) {
+    throw new Error('Invalid response structure from Gemini')
+  }
 
-    const parsed = JSON.parse(jsonMatch[0])
+  console.log(`[trendAnalyst] Analyzed ${parsed.trends.length} trends, ${parsed.recommendations?.length || 0} recommendations`)
 
-    if (!parsed.trends || !Array.isArray(parsed.trends)) {
-      throw new Error('Invalid response structure from Claude')
-    }
-
-    console.log(`[trendAnalyst] Analyzed ${parsed.trends.length} trends, ${parsed.recommendations?.length || 0} recommendations`)
-
-    return {
-      trends: parsed.trends,
-      recommendations: parsed.recommendations || parsed.trends.sort((a, b) => b.score - a.score).slice(0, 3)
-    }
-  } catch (err) {
-    console.error('[trendAnalyst] Claude error, falling back to mock:', err.message)
-    return {
-      trends: MOCK_TRENDS,
-      recommendations: MOCK_RECOMMENDATIONS
-    }
+  return {
+    trends: parsed.trends,
+    recommendations: parsed.recommendations || parsed.trends.sort((a, b) => b.score - a.score).slice(0, 3)
   }
 }

@@ -14,7 +14,7 @@
     "pg": "^8.13.0",
     "@electric-sql/pglite": "^0.2.0",
     "@langchain/langgraph": "^0.2.0",
-    "@langchain/anthropic": "^0.3.0",
+    "@langchain/google-vertexai": "^0.1.0",
     "@langchain/core": "^0.3.0"
   }
 }

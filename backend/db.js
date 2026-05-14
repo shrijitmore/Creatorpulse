@@ -1,4 +1,6 @@
 import { createRequire } from 'module'
+import { tmpdir } from 'os'
+import { join } from 'path'
 
 const require = createRequire(import.meta.url)
 
@@ -6,7 +8,9 @@ let db = null
 
 async function initPglite() {
   const { PGlite } = await import('@electric-sql/pglite')
-  const client = new PGlite('/tmp/pglite-trendforge')
+  const dbPath = join(tmpdir(), 'pglite-trendforge')
+  console.log(`[db] PGlite path: ${dbPath}`)
+  const client = new PGlite(dbPath)
   await client.waitReady
   return {
     query: async (sql, params) => {
@@ -40,7 +44,7 @@ export async function getDb() {
     console.log('[db] Using PostgreSQL via pg.Pool')
     db = initPg(process.env.DATABASE_URL)
   } else {
-    console.log('[db] Using PGlite at /tmp/pglite-trendforge')
+    console.log('[db] Using PGlite (local embedded)')
     db = await initPglite()
   }
 

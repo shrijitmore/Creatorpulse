@@ -60,16 +60,11 @@ app.locals.redis = redis
 
 // ── Health check ───────────────────────────────────────────────────────────────
 
-function isMockMode() {
-  if (process.env.MOCK_MODE === 'true') return true
-  return !process.env.ANTHROPIC_API_KEY && !process.env.APIFY_API_KEY && !process.env.RAPIDAPI_KEY
-}
-
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    mode: isMockMode() ? 'mock' : 'live',
+    mode: 'live',
     uptime: process.uptime(),
     version: '1.0.0'
   })
@@ -79,7 +74,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    mode: isMockMode() ? 'mock' : 'live',
+    mode: 'live',
     uptime: process.uptime(),
     version: '1.0.0'
   })
@@ -92,7 +87,7 @@ app.get('/api', (req, res) => {
     name: 'TrendForge API',
     version: '1.0.0',
     description: 'AI-powered content intelligence platform — trend scraping, viral analysis, and script generation',
-    mode: isMockMode() ? 'mock' : 'live',
+    mode: 'live',
     endpoints: [
       'POST /api/auth/login',
       'GET  /api/auth/me',
