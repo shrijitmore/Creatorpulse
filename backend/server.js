@@ -5,9 +5,16 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import Redis from 'ioredis'
 import { getDb } from './db.js'
+import { clerkMw } from './lib/auth.js'
+import { startScrapeJob, stopScrapeJob } from './jobs/scrapeJob.js'
 import trendsRouter from './routes/trends.js'
 import scriptsRouter from './routes/scripts.js'
 import userRouter from './routes/user.js'
+import onboardingRouter from './routes/onboarding.js'
+import profileRouter from './routes/profile.js'
+import memoryRouter from './routes/memory.js'
+import sceneRouter from './routes/scene.js'
+import recordingRouter from './routes/recording.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -17,6 +24,11 @@ const PORT = process.env.PORT || 3000
 
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] }))
 app.use(express.json({ limit: '10mb' }))
+
+// Clerk middleware — parses auth token on every request, sets req.auth
+if (process.env.CLERK_SECRET_KEY) {
+  app.use(clerkMw)
+}
 
 // Request logger
 app.use((req, res, next) => {
@@ -48,9 +60,11 @@ function initRedis() {
     }
   })
 
-  client.connect().catch(err => {
-    console.warn('[redis] Could not connect — caching disabled:', err.message)
-  })
+  client.connect()
+    .then(() => { startScrapeJob(client) })
+    .catch(err => {
+      console.warn('[redis] Could not connect — caching disabled:', err.message)
+    })
 
   return client
 }
@@ -109,9 +123,13 @@ app.get('/api', (req, res) => {
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-// Auth routes (on userRouter at /api/auth/* and /api/user/*)
 app.use('/api/auth', userRouter)
 app.use('/api/user', userRouter)
+app.use('/api/onboarding', onboardingRouter)
+app.use('/api/profile', profileRouter)
+app.use('/api/memory', memoryRouter)
+app.use('/api/scene', sceneRouter)
+app.use('/api/recording', recordingRouter)
 
 // Trends routes
 app.use('/api/trends', trendsRouter)
@@ -345,7 +363,7 @@ async function start() {
 
     const server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`\n🚀 TrendForge API running on port ${PORT}`)
-      console.log(`   Mode: ${isMockMode() ? '🔶 MOCK' : '🟢 LIVE'}`)
+      console.log(`   Mode: 🟢 LIVE`)
       console.log(`   Docs: http://localhost:${PORT}/docs`)
       console.log(`   Health: http://localhost:${PORT}/health\n`)
     })
@@ -355,6 +373,7 @@ async function start() {
       console.log(`\n[server] ${signal} received — shutting down gracefully`)
       server.close(async () => {
         try {
+          stopScrapeJob()
           await redis.quit()
           console.log('[server] Redis connection closed')
         } catch (_) {}

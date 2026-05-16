@@ -1,5 +1,32 @@
 import { ChatVertexAI } from '@langchain/google-vertexai'
 
+// ── Creator profile cache ─────────────────────────────────────────────────────
+// Cache profile system prompts in memory (per userId) to reduce token cost.
+// Gemini 2.5 Flash caches context at ~25% of normal token price.
+// We cache for 1 hour — invalidated when profile updates.
+
+const profileCache = new Map()  // userId → { systemPrompt, cachedAt }
+const PROFILE_CACHE_TTL = 60 * 60 * 1000  // 1 hour
+
+export function cacheCreatorProfile(userId, systemPrompt) {
+  profileCache.set(userId, { systemPrompt, cachedAt: Date.now() })
+}
+
+export function getCachedProfile(userId) {
+  const entry = profileCache.get(userId)
+  if (!entry) return null
+  if (Date.now() - entry.cachedAt > PROFILE_CACHE_TTL) {
+    profileCache.delete(userId)
+    return null
+  }
+  return entry.systemPrompt
+}
+
+export function invalidateProfileCache(userId) {
+  profileCache.delete(userId)
+  console.log(`[gemini] Profile cache invalidated for ${userId}`)
+}
+
 function parseCredentials() {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
   if (!raw) return null
@@ -48,8 +75,10 @@ export function extractJson(text) {
 
   let str = typeof text === 'string' ? text : JSON.stringify(text)
 
-  // Strip markdown code fences: ```json ... ``` or ``` ... ```
+  // Strip markdown code fences (closed or unclosed — handles truncated responses)
   str = str.replace(/```(?:json)?\s*([\s\S]*?)```/g, '$1').trim()
+  // Handle unclosed fence (truncated): strip opening fence only
+  if (str.startsWith('```')) str = str.replace(/^```(?:json)?\s*/, '').trim()
 
   // Try direct parse first
   try { return JSON.parse(str) } catch {}
@@ -60,13 +89,34 @@ export function extractJson(text) {
 
   let jsonStr = match[0]
 
-  // Fix trailing commas before } or ]
+  // Fix trailing commas
   jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1')
-
-  // Remove JS-style comments
+  // Remove JS comments
   jsonStr = jsonStr.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '')
 
-  try { return JSON.parse(jsonStr) } catch (e) {
+  try { return JSON.parse(jsonStr) } catch {}
+
+  // Last resort: if truncated JSON, try to close it gracefully
+  try {
+    // Count open braces/brackets and close them
+    let depth = 0
+    let inStr = false
+    let escape = false
+    for (const ch of jsonStr) {
+      if (escape) { escape = false; continue }
+      if (ch === '\\' && inStr) { escape = true; continue }
+      if (ch === '"') { inStr = !inStr; continue }
+      if (inStr) continue
+      if (ch === '{' || ch === '[') depth++
+      if (ch === '}' || ch === ']') depth--
+    }
+    // Trim to last complete object if truncated
+    const lastComplete = jsonStr.lastIndexOf('},"recommendations"')
+    if (lastComplete > 0 && depth !== 0) {
+      jsonStr = jsonStr.slice(0, lastComplete) + '},"recommendations":[]}'
+    }
+    return JSON.parse(jsonStr)
+  } catch (e) {
     throw new Error(`JSON parse failed: ${e.message}`)
   }
 }

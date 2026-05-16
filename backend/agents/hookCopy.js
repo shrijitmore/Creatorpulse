@@ -3,8 +3,9 @@ import { createGeminiModel, hasGeminiCredentials, extractJson } from '../lib/gem
 /**
  * Agent 4 — Hook & Copy Generator
  * Generates hook variants, caption, hashtags, thumbnail text via Gemini.
+ * When creatorContext provided, hooks match creator's voice fingerprint.
  */
-export async function generateCopyKit(script, topicTitle, niche) {
+export async function generateCopyKit(script, topicTitle, niche, creatorContext = null) {
   if (!hasGeminiCredentials()) {
     throw new Error('Gemini credentials not configured. Set GOOGLE_SERVICE_ACCOUNT_JSON in backend/.env')
   }
@@ -18,8 +19,12 @@ Format: ${script.format}
 Key scenes: ${script.scenes.map(s => s.voiceover).join(' | ')}
 CTA: ${script.cta}`.trim()
 
-  const prompt = `You are a social media copywriter specializing in viral Instagram Reels for ${niche} creators.
+  const voiceContext = creatorContext?.profile
+    ? `\nCREATOR VOICE: ${(creatorContext.profile.voice_traits || []).join(', ')} | Goal: ${creatorContext.profile.primary_goal} | Audience: ${creatorContext.profile.audience_persona}\n`
+    : ''
 
+  const prompt = `You are a social media copywriter specializing in viral Instagram Reels for ${niche} creators.
+${voiceContext}
 Given this reel script about "${topicTitle}":
 
 ${scriptSummary}
@@ -55,7 +60,7 @@ Rules:
     throw new Error('Invalid content kit structure from Gemini')
   }
 
-  console.log(`[hookCopy] Generated content kit for "${topicTitle}"`)
+  console.log(`[hookCopy] Generated content kit for "${topicTitle}"${creatorContext ? ' (with creator voice)' : ''}`)
 
   return {
     hookVariants: parsed.hookVariants,

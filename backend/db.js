@@ -6,6 +6,26 @@ const require = createRequire(import.meta.url)
 
 let db = null
 
+// ── Supabase / PostgreSQL ─────────────────────────────────────────────────────
+
+function initPg(connectionString) {
+  const pg = require('pg')
+  const { Pool } = pg
+  const cleanUrl = connectionString.replace(/[?&]sslmode=[^&]*/g, '')
+  const pool = new Pool({
+    connectionString: cleanUrl,
+    ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false }
+  })
+  return {
+    query: async (sql, params) => {
+      const result = await pool.query(sql, params)
+      return { rows: result.rows }
+    }
+  }
+}
+
+// ── PGlite (local dev fallback) ───────────────────────────────────────────────
+
 async function initPglite() {
   const { PGlite } = await import('@electric-sql/pglite')
   const dbPath = join(tmpdir(), 'pglite-trendforge')
@@ -20,31 +40,16 @@ async function initPglite() {
   }
 }
 
-function initPg(connectionString) {
-  const pg = require('pg')
-  const { Pool } = pg
-  // Strip sslmode from URL, add ssl config manually
-  const cleanUrl = connectionString.replace(/[?&]sslmode=[^&]*/g, '')
-  const pool = new Pool({
-    connectionString: cleanUrl,
-    ssl: { rejectUnauthorized: false }
-  })
-  return {
-    query: async (sql, params) => {
-      const result = await pool.query(sql, params)
-      return { rows: result.rows }
-    }
-  }
-}
+// ── Init ──────────────────────────────────────────────────────────────────────
 
 export async function getDb() {
   if (db) return db
 
   if (process.env.DATABASE_URL) {
-    console.log('[db] Using PostgreSQL via pg.Pool')
+    console.log('[db] Using PostgreSQL (Supabase)')
     db = initPg(process.env.DATABASE_URL)
   } else {
-    console.log('[db] Using PGlite (local embedded)')
+    console.log('[db] Using PGlite (local dev)')
     db = await initPglite()
   }
 
@@ -52,46 +57,146 @@ export async function getDb() {
   return db
 }
 
+// ── Migrations ────────────────────────────────────────────────────────────────
+
 async function runMigrations(db) {
+  const isSupabase = !!process.env.DATABASE_URL
+
   const statements = [
+    // pgvector extension (Supabase has it pre-installed)
+    isSupabase
+      ? `CREATE EXTENSION IF NOT EXISTS vector`
+      : null,
+
+    // Users table
     `CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      email TEXT UNIQUE,
-      niches TEXT[],
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      id          TEXT PRIMARY KEY,
+      email       TEXT UNIQUE NOT NULL,
+      name        TEXT,
+      niches      TEXT[],
+      clerk_id    TEXT UNIQUE,
+      created_at  TIMESTAMPTZ DEFAULT NOW(),
+      updated_at  TIMESTAMPTZ DEFAULT NOW()
     )`,
+
+    // Creator profiles — deep personalization data
+    `CREATE TABLE IF NOT EXISTS creator_profiles (
+      id              TEXT PRIMARY KEY,
+      user_id         TEXT UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      creator_name    TEXT,
+      platforms        TEXT[],
+      content_styles   TEXT[],
+      content_format   TEXT DEFAULT 'on-camera',
+      language_style   TEXT DEFAULT 'English',
+      audience_persona TEXT,
+      audience_age     TEXT,
+      primary_goal     TEXT,
+      raw_voice_sample TEXT,
+      voice_traits     JSONB DEFAULT '[]',
+      niche_strengths  JSONB DEFAULT '{}',
+      onboarding_done  BOOLEAN DEFAULT FALSE,
+      created_at       TIMESTAMPTZ DEFAULT NOW(),
+      updated_at       TIMESTAMPTZ DEFAULT NOW()
+    )`,
+
+    // Add new columns to existing table (safe if already exists)
+    `ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS content_format TEXT DEFAULT 'on-camera'`,
+    `ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS language_style TEXT DEFAULT 'English'`,
+    `ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS audience_age TEXT`,
+
+    // Scripts
     `CREATE TABLE IF NOT EXISTS scripts (
-      id TEXT PRIMARY KEY,
-      topic_id TEXT,
-      topic_title TEXT,
-      tone TEXT,
-      format TEXT,
-      hook_line TEXT,
-      scenes JSONB,
-      cta TEXT,
-      niche TEXT,
-      platform TEXT,
-      user_id TEXT,
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      id            TEXT PRIMARY KEY,
+      user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      topic_id      TEXT,
+      topic_title   TEXT,
+      tone          TEXT,
+      format        TEXT,
+      hook_line     TEXT,
+      scenes        JSONB,
+      cta           TEXT,
+      niche         TEXT,
+      platform      TEXT,
+      engagement_score INTEGER,
+      was_used      BOOLEAN DEFAULT FALSE,
+      created_at    TIMESTAMPTZ DEFAULT NOW()
     )`,
+
+    // Content kits
     `CREATE TABLE IF NOT EXISTS content_kits (
-      id TEXT PRIMARY KEY,
-      script_id TEXT UNIQUE,
-      hook_variants TEXT[],
-      caption TEXT,
-      hashtags JSONB,
+      id             TEXT PRIMARY KEY,
+      script_id      TEXT UNIQUE NOT NULL REFERENCES scripts(id) ON DELETE CASCADE,
+      hook_variants  TEXT[],
+      caption        TEXT,
+      hashtags       JSONB,
       thumbnail_text TEXT
     )`,
-    `INSERT INTO users (id, email, niches)
-     VALUES ('user-1', 'alex@trendforge.io', ARRAY['fitness','tech'])
-     ON CONFLICT DO NOTHING`
-  ]
+
+    // Script embeddings for RAG (pgvector — only on Supabase)
+    isSupabase
+      ? `CREATE TABLE IF NOT EXISTS script_embeddings (
+          id         TEXT PRIMARY KEY,
+          user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          script_id  TEXT NOT NULL REFERENCES scripts(id) ON DELETE CASCADE,
+          embedding  vector(768),
+          content    TEXT,
+          metadata   JSONB DEFAULT '{}',
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )`
+      : `CREATE TABLE IF NOT EXISTS script_embeddings (
+          id         TEXT PRIMARY KEY,
+          user_id    TEXT NOT NULL,
+          script_id  TEXT NOT NULL,
+          content    TEXT,
+          metadata   JSONB DEFAULT '{}',
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )`,
+
+    // Vector index (Supabase only)
+    isSupabase
+      ? `CREATE INDEX IF NOT EXISTS script_embeddings_vector_idx
+         ON script_embeddings USING ivfflat (embedding vector_cosine_ops)
+         WITH (lists = 50)`
+      : null,
+
+    // Topic memory — tracks topics per user to avoid repeats
+    `CREATE TABLE IF NOT EXISTS topic_memory (
+      id         TEXT PRIMARY KEY,
+      user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      topic      TEXT NOT NULL,
+      niche      TEXT,
+      count      INTEGER DEFAULT 1,
+      last_used  TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(user_id, topic)
+    )`,
+
+    // Recording sessions — tracks delivery improvement over time
+    `CREATE TABLE IF NOT EXISTS recording_sessions (
+      id               TEXT PRIMARY KEY,
+      user_id          TEXT NOT NULL,
+      scene_number     INTEGER,
+      overall_score    INTEGER DEFAULT 0,
+      confidence_score INTEGER DEFAULT 0,
+      energy_score     INTEGER DEFAULT 0,
+      accuracy_score   INTEGER DEFAULT 0,
+      filler_count     INTEGER DEFAULT 0,
+      created_at       TIMESTAMPTZ DEFAULT NOW()
+    )`,
+
+    // Seed default user (dev only)
+    `INSERT INTO users (id, email, name, niches)
+     VALUES ('user-1', 'alex@trendforge.io', 'Alex', ARRAY['fitness','tech'])
+     ON CONFLICT DO NOTHING`,
+  ].filter(Boolean)
 
   for (const sql of statements) {
     try {
       await db.query(sql, [])
     } catch (err) {
-      console.error('[db] Migration error:', err.message)
+      // ivfflat index may fail on small datasets — non-fatal
+      if (!err.message.includes('ivfflat')) {
+        console.error('[db] Migration error:', err.message.slice(0, 120))
+      }
     }
   }
 

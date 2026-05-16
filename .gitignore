@@ -1,6 +1,18 @@
 node_modules
 dist
 .env
-backend/.env
 *.env
+*.env.local
+
+# Frontend
+frontend/node_modules
+frontend/dist
+frontend/.env.local
+
+# Backend
+backend/.env
 backend/node_modules
+
+# OS
+.DS_Store
+Thumbs.db

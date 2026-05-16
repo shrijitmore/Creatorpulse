@@ -4,6 +4,9 @@ import { runScriptPipeline } from '../agents/pipeline.js'
 import { writeScript } from '../agents/scriptWriter.js'
 import { generateCopyKit } from '../agents/hookCopy.js'
 import { getDb } from '../db.js'
+import { requireAuth } from '../lib/auth.js'
+import { buildCreatorContext } from '../lib/memory.js'
+import { storeScriptEmbedding, trackTopic } from '../lib/embeddings.js'
 
 const router = Router()
 
@@ -11,6 +14,8 @@ function sendSSE(res, event, data) {
   res.write(`event: ${event}\n`)
   res.write(`data: ${JSON.stringify(data)}\n\n`)
 }
+
+router.use(requireAuth)
 
 // POST /api/scripts/generate  (SSE)
 router.post('/generate', async (req, res) => {
@@ -47,6 +52,11 @@ router.post('/generate', async (req, res) => {
     sendSSE(res, 'progress', { step: 1, status: 'done', label: 'Trends scanned' })
 
     sendSSE(res, 'progress', { step: 2, status: 'active', label: 'Analyzing virality signals...' })
+
+    // Fetch creator context (RAG + voice profile) in parallel with step 2 delay
+    const userId = req.userId || 'user-1'
+    const creatorContext = await buildCreatorContext(userId, topicTitle, niche).catch(() => null)
+
     await sleep(300)
     sendSSE(res, 'progress', { step: 2, status: 'done', label: 'Analysis complete' })
 
@@ -54,7 +64,7 @@ router.post('/generate', async (req, res) => {
 
     const { script, contentKit } = await runScriptPipeline(
       topicId || crypto.randomUUID(),
-      topicTitle, tone, format, niche, onProgress
+      topicTitle, tone, format, niche, onProgress, creatorContext
     )
 
     const scriptId = crypto.randomUUID()
@@ -68,7 +78,7 @@ router.post('/generate', async (req, res) => {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [scriptId, fullScript.topicId || topicId, fullScript.topicTitle, fullScript.tone,
          fullScript.format, fullScript.hookLine, JSON.stringify(fullScript.scenes),
-         fullScript.cta, fullScript.niche, fullScript.platform || 'instagram', 'user-1']
+         fullScript.cta, fullScript.niche, fullScript.platform || 'instagram', userId]
       )
       await db.query(
         `INSERT INTO content_kits (id, script_id, hook_variants, caption, hashtags, thumbnail_text)
@@ -79,6 +89,12 @@ router.post('/generate', async (req, res) => {
     } catch (dbErr) {
       console.error('[scripts/generate] DB persist error:', dbErr.message)
     }
+
+    // Async: embed script + track topic (non-blocking)
+    Promise.all([
+      storeScriptEmbedding(userId, scriptId, fullScript, fullKit).catch(e => console.error('[scripts] embed error:', e.message)),
+      trackTopic(userId, topicTitle, niche).catch(e => console.error('[scripts] topic track error:', e.message))
+    ])
 
     sendSSE(res, 'complete', { script: fullScript, contentKit: fullKit })
     res.end()
@@ -154,9 +170,9 @@ router.get('/', async (req, res) => {
   try {
     const { niche, format, platform } = req.query
     const db = await getDb()
-    let sql = 'SELECT * FROM scripts WHERE 1=1'
-    const params = []
-    let idx = 1
+    let sql = 'SELECT * FROM scripts WHERE user_id = $1'
+    const params = [req.userId]
+    let idx = 2
     if (niche) { sql += ` AND niche = $${idx++}`; params.push(niche) }
     if (format) { sql += ` AND format = $${idx++}`; params.push(format) }
     if (platform) { sql += ` AND platform = $${idx++}`; params.push(platform) }
@@ -182,7 +198,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params
     const db = await getDb()
-    const scriptRes = await db.query('SELECT * FROM scripts WHERE id = $1', [id])
+    const scriptRes = await db.query('SELECT * FROM scripts WHERE id = $1 AND user_id = $2', [id, req.userId])
 
     if (!scriptRes.rows || scriptRes.rows.length === 0) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Script not found' } })
@@ -220,7 +236,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params
     const db = await getDb()
-    const check = await db.query('SELECT id FROM scripts WHERE id = $1', [id])
+    const check = await db.query('SELECT id FROM scripts WHERE id = $1 AND user_id = $2', [id, req.userId])
     if (!check.rows || check.rows.length === 0) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Script not found' } })
     }

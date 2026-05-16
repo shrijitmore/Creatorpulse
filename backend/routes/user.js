@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { getDb } from '../db.js'
+import { requireAuth } from '../lib/auth.js'
 
 const router = Router()
 
@@ -88,7 +89,7 @@ router.get('/me', async (req, res) => {
 })
 
 // PATCH /api/user/niches
-router.patch('/niches', async (req, res) => {
+router.patch('/niches', requireAuth, async (req, res) => {
   try {
     const { niches } = req.body
 
@@ -111,7 +112,7 @@ router.patch('/niches', async (req, res) => {
     // Update DB
     try {
       const db = await getDb()
-      await db.query('UPDATE users SET niches = $1 WHERE id = $2', [cleanNiches, 'user-1'])
+      await db.query('UPDATE users SET niches = $1 WHERE id = $2', [cleanNiches, req.userId])
     } catch (dbErr) {
       console.error('[user/niches] DB update error:', dbErr.message)
     }

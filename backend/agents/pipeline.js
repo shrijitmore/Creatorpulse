@@ -68,34 +68,28 @@ export async function runTrendPipeline(niches, platforms) {
 // ─── Script Pipeline (Agents 3 + 4) ───────────────────────────────────────────
 
 const scriptStateChannels = {
-  topic: { value: (a, b) => b ?? a, default: () => '' },
-  topicTitle: { value: (a, b) => b ?? a, default: () => '' },
-  tone: { value: (a, b) => b ?? a, default: () => 'educational' },
-  format: { value: (a, b) => b ?? a, default: () => '60s' },
-  niche: { value: (a, b) => b ?? a, default: () => '' },
-  script: { value: (a, b) => b ?? a, default: () => null },
-  contentKit: { value: (a, b) => b ?? a, default: () => null },
-  onProgress: { value: (a, b) => b ?? a, default: () => null },
-  error: { value: (a, b) => b ?? a, default: () => null }
+  topic:          { value: (a, b) => b ?? a, default: () => '' },
+  topicTitle:     { value: (a, b) => b ?? a, default: () => '' },
+  tone:           { value: (a, b) => b ?? a, default: () => 'educational' },
+  format:         { value: (a, b) => b ?? a, default: () => '60s' },
+  niche:          { value: (a, b) => b ?? a, default: () => '' },
+  creatorContext: { value: (a, b) => b ?? a, default: () => null },
+  script:         { value: (a, b) => b ?? a, default: () => null },
+  contentKit:     { value: (a, b) => b ?? a, default: () => null },
+  onProgress:     { value: (a, b) => b ?? a, default: () => null },
+  error:          { value: (a, b) => b ?? a, default: () => null }
 }
 
 function makeWriteScriptNode() {
   return async function writeScriptNode(state) {
     console.log('[pipeline:script] Running write-script node')
-    if (state.onProgress) {
-      state.onProgress({ step: 3, status: 'active', label: 'Writing script...' })
-    }
+    if (state.onProgress) state.onProgress({ step: 3, status: 'active', label: 'Writing script...' })
     try {
       const script = await writeScript(
-        state.topic,
-        state.topicTitle,
-        state.tone,
-        state.format,
-        state.niche
+        state.topic, state.topicTitle, state.tone, state.format, state.niche,
+        state.creatorContext
       )
-      if (state.onProgress) {
-        state.onProgress({ step: 3, status: 'done', label: 'Script written' })
-      }
+      if (state.onProgress) state.onProgress({ step: 3, status: 'done', label: 'Script written' })
       return { script }
     } catch (err) {
       console.error('[pipeline:script] Write script node error:', err.message)
@@ -107,14 +101,13 @@ function makeWriteScriptNode() {
 function makeGenerateCopyNode() {
   return async function generateCopyNode(state) {
     console.log('[pipeline:script] Running generate-copy node')
-    if (state.onProgress) {
-      state.onProgress({ step: 4, status: 'active', label: 'Generating content kit...' })
-    }
+    if (state.onProgress) state.onProgress({ step: 4, status: 'active', label: 'Generating content kit...' })
     try {
-      const contentKit = await generateCopyKit(state.script, state.topicTitle, state.niche)
-      if (state.onProgress) {
-        state.onProgress({ step: 4, status: 'done', label: 'Content kit ready' })
-      }
+      const contentKit = await generateCopyKit(
+        state.script, state.topicTitle, state.niche,
+        state.creatorContext
+      )
+      if (state.onProgress) state.onProgress({ step: 4, status: 'done', label: 'Content kit ready' })
       return { contentKit }
     } catch (err) {
       console.error('[pipeline:script] Generate copy node error:', err.message)
@@ -146,14 +139,11 @@ function buildScriptGraph() {
  * @param {Function} onProgress - called with { step, status, label }
  * @returns {Promise<{ script: Script, contentKit: ContentKit }>}
  */
-export async function runScriptPipeline(topic, topicTitle, tone, format, niche, onProgress) {
+export async function runScriptPipeline(topic, topicTitle, tone, format, niche, onProgress, creatorContext = null) {
   const compiled = buildScriptGraph()
   const result = await compiled.invoke({
-    topic,
-    topicTitle,
-    tone,
-    format,
-    niche,
+    topic, topicTitle, tone, format, niche,
+    creatorContext: creatorContext || null,
     onProgress: onProgress || null
   })
 
