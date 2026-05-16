@@ -39,7 +39,7 @@ export async function requireAuth(req, res, next) {
         const fallbackEmail = `${clerkUserId.slice(-8)}@clerk.user`
         await db.query(
           `INSERT INTO users (id, email, clerk_id) VALUES ($1, $2, $3)
-           ON CONFLICT (clerk_id) DO UPDATE SET id = id RETURNING id`,
+           ON CONFLICT (clerk_id) DO UPDATE SET email = EXCLUDED.email RETURNING id`,
           [newId, fallbackEmail, clerkUserId]
         )
         const created = await db.query('SELECT id FROM users WHERE clerk_id = $1', [clerkUserId])

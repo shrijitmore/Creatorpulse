@@ -1,4 +1,4 @@
-import { createGeminiModel, hasGeminiCredentials, extractJson } from '../lib/gemini.js'
+import { createGeminiModel, hasGeminiCredentials, extractJson, extractResponseText } from '../lib/gemini.js'
 import { GEMINI, SCRAPING } from '../constants.js'
 
 const VALID_NICHES = ['fitness', 'finance', 'tech', 'lifestyle', 'food', 'travel', 'beauty', 'gaming']
@@ -43,7 +43,7 @@ Return ONLY valid JSON (NO markdown):
 {"trends":[{"idx":1,"title":"...","platform":"...","signal":"...","summary":"...","score":0,"niche":"..."}],"recommendations":[{"idx":1},{"idx":2},{"idx":3}]}`
 
   const response = await model.invoke(prompt)
-  const content = typeof response.content === 'string' ? response.content : JSON.stringify(response.content)
+  const content = extractResponseText(response)
   const parsed = extractJson(content)
 
   if (!parsed.trends || !Array.isArray(parsed.trends)) throw new Error('Invalid response from Gemini')

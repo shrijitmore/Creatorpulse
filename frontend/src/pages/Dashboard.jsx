@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/clerk-react'
 import { Icon, Button, Chip, Pill, PageHeader, IconButton, Tooltip } from '../components/ui.jsx'
@@ -13,6 +13,13 @@ const PLATFORM_OPTS = [
 const SIGNAL_OPTS = [
   { id:'all', label:'All' }, { id:'viral', label:'Viral' },
   { id:'rising', label:'Rising' }, { id:'new', label:'New' },
+]
+
+const FETCH_STEPS = [
+  { id:'reddit',   label:'Scanning Reddit communities',   duration: 8000  },
+  { id:'youtube',  label:'Pulling YouTube trends',        duration: 10000 },
+  { id:'instagram',label:'Reading Instagram signals',     duration: 10000 },
+  { id:'ai',       label:'AI ranking your signals',       duration: 99999 },
 ]
 
 // ─── Signal pill ─────────────────────────────────────────────────────────────
@@ -63,7 +70,6 @@ function TrendCard({ t, onGenerate, index = 0, hero = false, crossPlatforms }) {
     navigate(`/studio?topicId=${t.id}&title=${encodeURIComponent(t.title)}&niche=${encodeURIComponent(t.niche || '')}`)
   }
 
-  // Cross-platform: other platforms this topic appears on
   const otherPlatforms = crossPlatforms
     ? [...crossPlatforms].filter(p => p !== t.platform)
     : []
@@ -71,7 +77,6 @@ function TrendCard({ t, onGenerate, index = 0, hero = false, crossPlatforms }) {
   return (
     <article className="card overflow-hidden fade-up flex flex-col hover:shadow-lift transition-shadow"
       style={{ animationDelay:`${index * 40}ms` }}>
-      {/* Header strip */}
       <div className="px-5 pt-4 pb-3 flex items-center gap-2.5 border-b border-line2">
         <PlatformChip id={t.platform}/>
         <span className="text-ink4 text-[10px]">·</span>
@@ -79,8 +84,6 @@ function TrendCard({ t, onGenerate, index = 0, hero = false, crossPlatforms }) {
         <span className="flex-1"/>
         <SignalPill kind={t.signal}/>
       </div>
-
-      {/* Body */}
       <div className="px-5 pt-4 pb-3 flex-1">
         {hero && <Chip tone="ink" className="mb-2">Editor's pick</Chip>}
         <h3 className="text-[16px] font-semibold tracking-[-0.005em] text-ink leading-snug mb-2">{t.title}</h3>
@@ -94,8 +97,6 @@ function TrendCard({ t, onGenerate, index = 0, hero = false, crossPlatforms }) {
           </div>
         )}
       </div>
-
-      {/* Metrics */}
       <div className="px-5 py-3 border-t border-line bg-paper flex items-center gap-4">
         <div className="flex items-center gap-2">
           <span className="text-[10.5px] text-ink3 uppercase tracking-[0.06em] font-medium">Signal</span>
@@ -115,8 +116,6 @@ function TrendCard({ t, onGenerate, index = 0, hero = false, crossPlatforms }) {
           </div>
         )}
       </div>
-
-      {/* Cross-platform badge */}
       {otherPlatforms.length > 0 && (
         <div className="px-5 py-2 border-t border-line2 flex items-center gap-1.5">
           <Icon.Rising size={10} style={{ color:'var(--success)' }}/>
@@ -124,8 +123,6 @@ function TrendCard({ t, onGenerate, index = 0, hero = false, crossPlatforms }) {
           {otherPlatforms.map(p => <PlatformChip key={p} id={p}/>)}
         </div>
       )}
-
-      {/* CTA */}
       <button onClick={handleGenerate}
         className="w-full px-5 py-3 border-t border-line text-left flex items-center justify-between hover:bg-paper2 transition-colors group">
         <span className="text-[13px] font-medium text-ink flex items-center gap-2">
@@ -134,33 +131,6 @@ function TrendCard({ t, onGenerate, index = 0, hero = false, crossPlatforms }) {
         <Icon.Arrow size={13} className="text-ink3 group-hover:text-ink transition-colors"/>
       </button>
     </article>
-  )
-}
-
-// ─── Skeleton card ────────────────────────────────────────────────────────────
-
-function SkeletonCard() {
-  return (
-    <div className="card overflow-hidden">
-      <div className="px-5 pt-4 pb-3 border-b border-line2 flex items-center gap-2">
-        <div className="skel h-5 w-20 rounded"/>
-        <div className="flex-1"/>
-        <div className="skel h-5 w-12 rounded"/>
-      </div>
-      <div className="px-5 pt-4 pb-3">
-        <div className="skel h-4 w-full rounded mb-2"/>
-        <div className="skel h-4 w-4/5 rounded mb-2"/>
-        <div className="skel h-3 w-2/3 rounded"/>
-      </div>
-      <div className="px-5 py-3 border-t border-line bg-paper flex items-center gap-4">
-        <div className="skel h-4 w-16 rounded"/>
-        <div className="flex-1"/>
-        <div className="skel h-4 w-20 rounded"/>
-      </div>
-      <div className="px-5 py-3 border-t border-line">
-        <div className="skel h-4 w-28 rounded"/>
-      </div>
-    </div>
   )
 }
 
@@ -175,7 +145,7 @@ function CreatorBrief({ apiProfile, stats }) {
   const initials = name.split(' ').map(w => w[0]).slice(0, 2).join('')
 
   const voiceLabel = apiProfile?.contentStyles?.[0] || storedProfile.styles?.split(' + ')[0] || 'Storytelling'
-  const goalLabel = apiProfile?.primaryGoal || storedProfile.goal || 'Grow audience'
+  const goalLabel  = apiProfile?.primaryGoal || storedProfile.goal || 'Grow audience'
   const scriptsLabel = stats?.totalScripts != null ? `${stats.totalScripts} scripts` : '—'
 
   return (
@@ -217,7 +187,168 @@ function CreatorBrief({ apiProfile, stats }) {
   )
 }
 
-// ─── Section header ───────────────────────────────────────────────────────────
+// ─── Phase: Idle — niche picker ───────────────────────────────────────────────
+
+function IdlePhase({ selectedNiches, onToggleNiche, onFetch }) {
+  const todayStr = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' })
+  const canFetch = selectedNiches.length > 0
+
+  return (
+    <div className="fade-up flex flex-col items-center justify-center py-16 px-4">
+      <p className="kicker mb-3">{todayStr}</p>
+      <h1 className="text-[28px] font-semibold tracking-[-0.02em] text-ink text-center mb-2">
+        What's moving today?
+      </h1>
+      <p className="text-[14px] text-ink3 text-center max-w-md leading-relaxed mb-10">
+        Pick your niches and we'll scan Reddit, YouTube, and Instagram for the
+        best signals — summarised and ranked just for you.
+      </p>
+
+      <div className="card w-full max-w-xl p-6">
+        <p className="text-[11px] text-ink3 font-medium uppercase tracking-[0.08em] mb-3">
+          Select niches
+        </p>
+        <div className="flex flex-wrap gap-2 mb-6">
+          {NICHES.map(n => (
+            <Pill key={n.id} active={selectedNiches.includes(n.id)}
+              onClick={() => onToggleNiche(n.id)}>
+              {n.icon} {n.label}
+            </Pill>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between pt-4 border-t border-line">
+          <span className="text-[12px] text-ink3">
+            {selectedNiches.length === 0
+              ? 'Select at least one niche'
+              : `${selectedNiches.length} niche${selectedNiches.length > 1 ? 's' : ''} selected · ~30 sec fetch`}
+          </span>
+          <Button variant="primary" size="md" disabled={!canFetch}
+            icon={<Icon.Sparkle size={13}/>} onClick={onFetch}>
+            Get my feed
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Phase: Loading — animated step progress ──────────────────────────────────
+
+function LoadingPhase({ selectedNiches }) {
+  const [stepIdx, setStepIdx] = useState(0)
+  const [progress, setProgress] = useState(0)
+  const rafRef = useRef(null)
+  const startRef = useRef(Date.now())
+  const TOTAL_MS = 36000  // 36s estimated, snaps to 100% when data arrives
+
+  useEffect(() => {
+    let stepStart = Date.now()
+
+    const advanceStep = (idx) => {
+      if (idx >= FETCH_STEPS.length - 1) return
+      const step = FETCH_STEPS[idx]
+      const timer = setTimeout(() => {
+        setStepIdx(idx + 1)
+        stepStart = Date.now()
+        advanceStep(idx + 1)
+      }, step.duration)
+      return timer
+    }
+
+    const timer = advanceStep(0)
+
+    const tick = () => {
+      const elapsed = Date.now() - startRef.current
+      const pct = Math.min(90, (elapsed / TOTAL_MS) * 100)
+      setProgress(pct)
+      rafRef.current = requestAnimationFrame(tick)
+    }
+    rafRef.current = requestAnimationFrame(tick)
+
+    return () => {
+      clearTimeout(timer)
+      cancelAnimationFrame(rafRef.current)
+    }
+  }, [])
+
+  const nicheLabels = selectedNiches
+    .map(id => NICHES.find(n => n.id === id)?.label)
+    .filter(Boolean)
+
+  return (
+    <div className="fade-up flex flex-col items-center justify-center py-16 px-4">
+      <div className="card w-full max-w-xl p-8">
+        <div className="mb-6">
+          <p className="text-[11px] text-ink3 font-medium uppercase tracking-[0.08em] mb-1">
+            Fetching live signals
+          </p>
+          <h2 className="text-[20px] font-semibold tracking-[-0.01em] text-ink">
+            Finding your best content…
+          </h2>
+          <p className="text-[13px] text-ink3 mt-1">
+            {nicheLabels.join(' · ')}
+          </p>
+        </div>
+
+        {/* Progress bar */}
+        <div className="h-1.5 rounded-full bg-line overflow-hidden mb-6">
+          <div className="h-full rounded-full transition-all duration-500 ease-out"
+            style={{ width:`${progress}%`, background:'var(--terra)' }}/>
+        </div>
+
+        {/* Steps */}
+        <div className="flex flex-col gap-3">
+          {FETCH_STEPS.map((step, i) => {
+            const done    = i < stepIdx
+            const current = i === stepIdx
+            return (
+              <div key={step.id} className="flex items-center gap-3">
+                <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                  {done ? (
+                    <span className="w-5 h-5 rounded-full flex items-center justify-center"
+                      style={{ background:'var(--successsoft)', color:'var(--success)' }}>
+                      <Icon.Check size={11}/>
+                    </span>
+                  ) : current ? (
+                    <span className="w-5 h-5 rounded-full border-2 flex items-center justify-center"
+                      style={{ borderColor:'var(--terra)' }}>
+                      <span className="w-1.5 h-1.5 rounded-full pulse-soft"
+                        style={{ background:'var(--terra)' }}/>
+                    </span>
+                  ) : (
+                    <span className="w-5 h-5 rounded-full border border-line bg-paper2"/>
+                  )}
+                </div>
+                <span className={`text-[13px] font-medium transition-colors ${
+                  done ? 'text-ink3 line-through decoration-ink4' :
+                  current ? 'text-ink' : 'text-ink4'
+                }`}>
+                  {step.label}
+                </span>
+                {current && (
+                  <span className="flex gap-0.5 ml-auto">
+                    <span className="tdot"/><span className="tdot"/><span className="tdot"/>
+                  </span>
+                )}
+                {done && (
+                  <span className="text-[11px] text-ink4 font-mono ml-auto">done</span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        <p className="text-[12px] text-ink4 text-center mt-6 leading-relaxed">
+          Scanning across communities and ranking by engagement velocity.
+          <br/>This takes about 30 – 40 seconds.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ─── Phase: Ready — results ───────────────────────────────────────────────────
 
 function SectionHeader({ kicker, title, sub }) {
   return (
@@ -231,19 +362,20 @@ function SectionHeader({ kicker, title, sub }) {
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 
+// phase: 'idle' | 'loading' | 'ready'
+
 export default function Dashboard() {
   const storedNiches = useMemo(() => {
     try { return JSON.parse(localStorage.getItem('trendforge_niches') || '[]') } catch { return [] }
   }, [])
 
-  // All filters are local state — no API calls on change
+  const [phase, setPhase] = useState('idle')
   const [selectedNiches, setSelectedNiches] = useState(
     storedNiches.length > 0 ? storedNiches : NICHES.map(n => n.id)
   )
   const [platform, setPlatform] = useState('all')
-  const [signal, setSignal]   = useState('all')
-
-  const [apiProfile, setApiProfile] = useState(null)
+  const [signal, setSignal]     = useState('all')
+  const [apiProfile, setApiProfile]   = useState(null)
   const [profileStats, setProfileStats] = useState(null)
 
   useEffect(() => {
@@ -252,10 +384,32 @@ export default function Dashboard() {
       .catch(() => {})
   }, [])
 
-  // Fetch trends for user's selected niches — filter client-side instantly
-  const { allTrends, allRecommendations, loading, refreshing, lastUpdated, refresh } = useTrends(selectedNiches)
+  const { allTrends, loading, refreshing, lastUpdated, fetchNow, refresh } =
+    useTrends(selectedNiches, { lazy: true })
 
-  // Build cross-platform map: normalized title → platforms it appears on
+  // Transition to ready once fetch resolves
+  useEffect(() => {
+    if (phase === 'loading' && !loading && allTrends.length >= 0 && lastUpdated) {
+      setPhase('ready')
+    }
+  }, [phase, loading, lastUpdated])
+
+  const handleFetch = useCallback(() => {
+    setPhase('loading')
+    fetchNow(selectedNiches).catch(() => setPhase('idle'))
+  }, [selectedNiches, fetchNow])
+
+  const handleToggleNiche = useCallback((id) => {
+    setSelectedNiches(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    )
+  }, [])
+
+  const handleRefresh = useCallback(() => {
+    setPhase('loading')
+    refresh(selectedNiches).catch(() => setPhase('ready'))
+  }, [selectedNiches, refresh])
+
   const crossPlatformMap = useMemo(() => {
     const map = {}
     for (const t of allTrends) {
@@ -267,7 +421,6 @@ export default function Dashboard() {
     return map
   }, [allTrends])
 
-  // All filtering happens here, zero API calls
   const filtered = useMemo(() => {
     let list = [...allTrends]
     if (selectedNiches.length > 0) list = list.filter(t => selectedNiches.includes(t.niche))
@@ -276,11 +429,10 @@ export default function Dashboard() {
     return list
   }, [allTrends, selectedNiches, platform, signal])
 
-  // Balanced picks: top 2 from each platform
   const recommendations = useMemo(() => {
     const byPlatform = {}
     for (const t of allTrends) {
-      if (!selectedNiches.includes(t.niche)) continue  // respect niche filter
+      if (!selectedNiches.includes(t.niche)) continue
       if (!byPlatform[t.platform]) byPlatform[t.platform] = []
       byPlatform[t.platform].push(t)
     }
@@ -291,7 +443,6 @@ export default function Dashboard() {
     for (const p of ['instagram', 'youtube', 'reddit']) {
       if (byPlatform[p]) picks.push(...byPlatform[p].slice(0, 2))
     }
-    // Fill with top overall if any platform missing
     if (picks.length < 4) {
       const seen = new Set(picks.map(p => p.id))
       const topRest = allTrends.filter(t => !seen.has(t.id)).sort((a,b)=>(b.score??0)-(a.score??0))
@@ -300,21 +451,41 @@ export default function Dashboard() {
     return picks.slice(0, 6)
   }, [allTrends, selectedNiches])
 
-  const handleRefresh = () => refresh()
+  if (phase === 'idle') {
+    return (
+      <div className="px-6 lg:px-8 py-7 max-w-[1400px] mx-auto">
+        <div className="mt-4"><CreatorBrief apiProfile={apiProfile} stats={profileStats}/></div>
+        <IdlePhase
+          selectedNiches={selectedNiches}
+          onToggleNiche={handleToggleNiche}
+          onFetch={handleFetch}
+        />
+      </div>
+    )
+  }
 
+  if (phase === 'loading') {
+    return (
+      <div className="px-6 lg:px-8 py-7 max-w-[1400px] mx-auto">
+        <LoadingPhase selectedNiches={selectedNiches}/>
+      </div>
+    )
+  }
+
+  // ── Ready ──────────────────────────────────────────────────────────────────
   const todayStr = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' })
 
   return (
     <div className="px-6 lg:px-8 py-7 max-w-[1400px] mx-auto">
       <PageHeader
-        kicker={`${todayStr} · 14 communities watched`}
+        kicker={`${todayStr} · ${selectedNiches.length * 2} communities watched`}
         title="What's moving today"
-        sub="Your daily read of trends — sorted by signal, filtered by your niches, summarised so you can decide in seconds."
+        sub="Sorted by signal, filtered by your niches — decide in seconds."
         right={
           <>
             <Button variant="soft" size="sm"
               icon={<Icon.Refresh size={13} className={refreshing ? 'spin' : ''}/>}
-              onClick={handleRefresh} disabled={loading || refreshing}>
+              onClick={handleRefresh} disabled={refreshing}>
               {refreshing ? 'Syncing…' : 'Refresh'}
             </Button>
             {lastUpdated && (
@@ -326,7 +497,6 @@ export default function Dashboard() {
         }
       />
 
-      {/* Creator brief */}
       <div className="mt-6"><CreatorBrief apiProfile={apiProfile} stats={profileStats}/></div>
 
       {/* Filter row */}
@@ -335,7 +505,7 @@ export default function Dashboard() {
         <div className="flex flex-wrap gap-1.5">
           {NICHES.map(n => (
             <Pill key={n.id} active={selectedNiches.includes(n.id)}
-              onClick={() => setSelectedNiches(prev => prev.includes(n.id) ? prev.filter(x => x !== n.id) : [...prev, n.id])}>
+              onClick={() => handleToggleNiche(n.id)}>
               {n.icon} {n.label}
             </Pill>
           ))}
@@ -356,13 +526,14 @@ export default function Dashboard() {
       </div>
 
       {/* Editor's picks */}
-      {!loading && recommendations.length > 0 && (
+      {recommendations.length > 0 && (
         <>
           <SectionHeader kicker="Editor's picks" title="Two from each platform"
             sub="Top 2 picks from Instagram · YouTube · Reddit — balanced across sources."/>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-4">
             {recommendations.slice(0, 3).map((t, i) => (
-              <TrendCard key={`rec-${t.id}`} t={t} onGenerate={() => {}} index={i} hero crossPlatforms={crossPlatformMap[t.title?.toLowerCase().slice(0,30)]}/>
+              <TrendCard key={`rec-${t.id}`} t={t} onGenerate={() => {}} index={i} hero
+                crossPlatforms={crossPlatformMap[t.title?.toLowerCase().slice(0,30)]}/>
             ))}
           </div>
         </>
@@ -371,11 +542,7 @@ export default function Dashboard() {
       {/* All trends */}
       <SectionHeader kicker="The feed" title={`${filtered.length} signals across your niches`}
         sub="Pull-quote summaries with sources, posts, and a 7-day shape."/>
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-4">
-          {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i}/>)}
-        </div>
-      ) : filtered.length === 0 ? (
+      {filtered.length === 0 ? (
         <div className="card mt-4">
           <div className="py-14 text-center px-6">
             <div className="w-12 h-12 mx-auto rounded-xl bg-paper2 border border-line flex items-center justify-center text-ink3 mb-4">
@@ -387,7 +554,10 @@ export default function Dashboard() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-4">
-          {filtered.map((t, i) => <TrendCard key={t.id} t={t} onGenerate={() => {}} index={i} crossPlatforms={crossPlatformMap[t.title?.toLowerCase().slice(0,30)]}/>)}
+          {filtered.map((t, i) => (
+            <TrendCard key={t.id} t={t} onGenerate={() => {}} index={i}
+              crossPlatforms={crossPlatformMap[t.title?.toLowerCase().slice(0,30)]}/>
+          ))}
         </div>
       )}
 

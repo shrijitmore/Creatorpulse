@@ -101,6 +101,7 @@ function makeWriteScriptNode() {
 function makeGenerateCopyNode() {
   return async function generateCopyNode(state) {
     console.log('[pipeline:script] Running generate-copy node')
+    if (!state.script) return { contentKit: null }
     if (state.onProgress) state.onProgress({ step: 4, status: 'active', label: 'Generating content kit...' })
     try {
       const contentKit = await generateCopyKit(

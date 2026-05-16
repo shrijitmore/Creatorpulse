@@ -1,4 +1,4 @@
-import { createGeminiModel, hasGeminiCredentials, extractJson } from '../lib/gemini.js'
+import { createGeminiModel, hasGeminiCredentials, extractJson, extractResponseText } from '../lib/gemini.js'
 
 /**
  * Agent 3 — Script Writer
@@ -68,7 +68,7 @@ Return ONLY valid JSON, no markdown:
 }`
 
   const response = await model.invoke(prompt)
-  const content = typeof response.content === 'string' ? response.content : JSON.stringify(response.content)
+  const content = extractResponseText(response)
   const parsed = extractJson(content)
 
   if (!parsed.hookLine || !parsed.scenes || !Array.isArray(parsed.scenes)) {

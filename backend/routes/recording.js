@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { requireAuth } from '../lib/auth.js'
-import { createGeminiModel } from '../lib/gemini.js'
+import { createGeminiModel, extractResponseText } from '../lib/gemini.js'
 import { getCreatorProfile } from '../lib/memory.js'
 import { getDb } from '../db.js'
 import crypto from 'crypto'
@@ -120,7 +120,7 @@ Return ONLY valid JSON:
       }
     ])
 
-    const content = typeof response.content === 'string' ? response.content : JSON.stringify(response.content)
+    const content = extractResponseText(response)
 
     // Extract JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/)

@@ -1,6 +1,6 @@
 import { findSimilarScripts, getCoveredTopics } from './embeddings.js'
 import { getDb } from '../db.js'
-import { getCachedProfile, cacheCreatorProfile } from './gemini.js'
+import { getCachedProfile, cacheCreatorProfile, invalidateProfileCache } from './gemini.js'
 
 /**
  * Build full RAG context for a user + topic.

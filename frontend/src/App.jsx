@@ -106,7 +106,7 @@ function AppRoutes() {
 
     const path = window.location.pathname
     // Don't redirect on public pages
-    if (['/sign-in', '/sign-up', '/'].some(p => path.startsWith(p))) return
+    if (['/sign-in', '/sign-up'].some(p => path.startsWith(p))) return
 
     if (!onboarded && path !== '/onboarding') {
       navigate('/onboarding', { replace: true })

@@ -1,4 +1,4 @@
-import { createGeminiModel, hasGeminiCredentials, extractJson } from '../lib/gemini.js'
+import { createGeminiModel, hasGeminiCredentials, extractJson, extractResponseText } from '../lib/gemini.js'
 
 /**
  * Agent 4 — Hook & Copy Generator
@@ -10,7 +10,7 @@ export async function generateCopyKit(script, topicTitle, niche, creatorContext 
     throw new Error('Gemini credentials not configured. Set GOOGLE_SERVICE_ACCOUNT_JSON in backend/.env')
   }
 
-  const model = createGeminiModel({ temperature: 0.8, maxOutputTokens: 2000 })
+  const model = createGeminiModel({ temperature: 0.8, maxOutputTokens: 4096 })
 
   const scriptSummary = `Topic: ${topicTitle}
 Hook: ${script.hookLine}
@@ -53,7 +53,7 @@ Rules:
 - thumbnailText: ALL CAPS, 3-6 words max`
 
   const response = await model.invoke(prompt)
-  const content = typeof response.content === 'string' ? response.content : JSON.stringify(response.content)
+  const content = extractResponseText(response)
   const parsed = extractJson(content)
 
   if (!parsed.hookVariants || !parsed.caption || !parsed.hashtags) {

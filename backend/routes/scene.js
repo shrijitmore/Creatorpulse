@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { requireAuth } from '../lib/auth.js'
-import { createGeminiModel, extractJson } from '../lib/gemini.js'
+import { createGeminiModel, extractJson, extractResponseText } from '../lib/gemini.js'
 import { getCreatorProfile } from '../lib/memory.js'
 import { GEMINI } from '../constants.js'
 
@@ -83,7 +83,7 @@ Rules:
 - Keep suggestion in creator's language style: ${profile?.language_style || 'English'}`
 
     const response = await model.invoke(prompt)
-    const content = typeof response.content === 'string' ? response.content : JSON.stringify(response.content)
+    const content = extractResponseText(response)
     const parsed = extractJson(content)
 
     res.json({ success: true, data: parsed })
@@ -133,7 +133,7 @@ Generate a refined version based on their feedback. Return ONLY valid JSON:
 }`
 
     const response = await model.invoke(prompt)
-    const content = typeof response.content === 'string' ? response.content : JSON.stringify(response.content)
+    const content = extractResponseText(response)
     const parsed = extractJson(content)
 
     res.json({ success: true, data: parsed })

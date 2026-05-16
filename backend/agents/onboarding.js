@@ -1,4 +1,4 @@
-import { createGeminiModel, extractJson } from '../lib/gemini.js'
+import { createGeminiModel, extractJson, extractResponseText } from '../lib/gemini.js'
 import { saveCreatorProfile } from '../lib/memory.js'
 import { GEMINI } from '../constants.js'
 
@@ -64,7 +64,7 @@ If no voice sample, infer from content styles and format.`
 
   try {
     const response = await model.invoke(prompt)
-    const content = typeof response.content === 'string' ? response.content : JSON.stringify(response.content)
+    const content = extractResponseText(response)
     const parsed = extractJson(content)
 
     voiceTraits = parsed.voiceTraits || voiceTraits

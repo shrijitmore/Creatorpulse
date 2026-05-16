@@ -67,6 +67,26 @@ export function createGeminiModel({ temperature = 0.7, maxOutputTokens = 3000 } 
 }
 
 /**
+ * Extract plain text from a LangChain response.
+ * Gemini 2.5 Flash via @langchain/google-vertexai returns content as either
+ * a plain string or an array of typed content blocks — handle both.
+ */
+export function extractResponseText(response) {
+  const content = response?.content
+  if (typeof content === 'string') {
+    return content
+  }
+  if (Array.isArray(content)) {
+    const text = content.filter(b => b.type === 'text').map(b => b.text || '').join('')
+    if (!text) {
+      return content.map(b => b.text || b.content || b.thinking || '').join('')
+    }
+    return text
+  }
+  return typeof content === 'object' ? JSON.stringify(content) : String(content ?? '')
+}
+
+/**
  * Robustly extract and parse JSON from Gemini response text.
  * Handles: markdown code fences, trailing commas, single-line responses.
  */
@@ -85,7 +105,34 @@ export function extractJson(text) {
 
   // Extract largest {...} block
   const match = str.match(/\{[\s\S]*\}/)
-  if (!match) throw new Error('No JSON object found in Gemini response')
+
+  // No closing } found — JSON was truncated before any object closed.
+  // Try to salvage by closing all open braces/brackets.
+  if (!match) {
+    const start = str.indexOf('{')
+    if (start === -1) throw new Error('No JSON object found in Gemini response')
+    let truncated = str.slice(start)
+    // Remove trailing commas and incomplete last key-value
+    truncated = truncated.replace(/,\s*$/, '')
+    // Close open string if needed
+    const quoteCount = (truncated.match(/(?<!\\)"/g) || []).length
+    if (quoteCount % 2 !== 0) truncated += '"'
+    // Count open braces/brackets
+    let depth = 0; let inStr = false; let escape = false
+    const stack = []
+    for (const ch of truncated) {
+      if (escape) { escape = false; continue }
+      if (ch === '\\' && inStr) { escape = true; continue }
+      if (ch === '"') { inStr = !inStr; continue }
+      if (inStr) continue
+      if (ch === '{') { stack.push('}'); depth++ }
+      else if (ch === '[') { stack.push(']'); depth++ }
+      else if (ch === '}' || ch === ']') { stack.pop(); depth-- }
+    }
+    truncated += stack.reverse().join('')
+    try { return JSON.parse(truncated) } catch {}
+    throw new Error('No JSON object found in Gemini response')
+  }
 
   let jsonStr = match[0]
 
