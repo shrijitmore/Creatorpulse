@@ -4,6 +4,7 @@ import { useAuth, useUser } from '@clerk/clerk-react'
 import { ToastProvider, Logomark } from './components/ui.jsx'
 import { setTokenGetter } from './lib/apiClient.js'
 import Layout from './components/Layout.jsx'
+import Landing from './pages/Landing.jsx'
 import Onboarding from './pages/Onboarding.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import ScriptStudio from './pages/ScriptStudio.jsx'
@@ -26,7 +27,7 @@ function CheckingScreen() {
   )
 }
 
-// ─── Onboarding gate — checks Supabase, not just localStorage ────────────────
+// ─── Onboarding gate — checks DB, not just localStorage ──────────────────────
 
 function useOnboardingGate() {
   const { isSignedIn, isLoaded } = useUser()
@@ -52,10 +53,7 @@ function useOnboardingGate() {
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
         })
       })
-      .then(r => {
-        if (!r.ok) throw new Error(`Status ${r.status}`)
-        return r.json()
-      })
+      .then(r => { if (!r.ok) throw new Error(`Status ${r.status}`); return r.json() })
       .then(data => {
         if (cancelled) return
         resolvedRef.current = true
@@ -74,14 +72,13 @@ function useOnboardingGate() {
       .catch(() => {
         if (cancelled) return
         resolvedRef.current = true
-        // Fall back to localStorage
         const local = localStorage.getItem('trendforge_niches')
         const hasLocal = (() => { try { const p = JSON.parse(local || '[]'); return Array.isArray(p) && p.length > 0 } catch { return false } })()
         setState({ checking: false, onboarded: hasLocal })
       })
 
     return () => { cancelled = true }
-  }, [isSignedIn, isLoaded])  // getToken intentionally omitted — stable ref
+  }, [isSignedIn, isLoaded])
 
   return state
 }
@@ -93,7 +90,7 @@ function AppRoutes() {
   const { getToken } = useAuth()
   const navigate = useNavigate()
 
-  // Register token at root level — runs before child effects
+  // Register token getter so all api.js calls attach Bearer header
   useEffect(() => {
     if (!isSignedIn || !getToken) { setTokenGetter(null); return }
     setTokenGetter(() => getToken())
@@ -102,60 +99,57 @@ function AppRoutes() {
 
   const { checking, onboarded } = useOnboardingGate()
 
-  // Imperative redirect — read pathname from window to avoid dep-loop
+  // Redirect signed-in users to correct destination
   useEffect(() => {
     if (!isLoaded || checking) return
     if (!isSignedIn) return
 
     const path = window.location.pathname
-    if (path.startsWith('/sign-in') || path.startsWith('/sign-up')) return
+    // Don't redirect on public pages
+    if (['/sign-in', '/sign-up', '/'].some(p => path.startsWith(p))) return
 
     if (!onboarded && path !== '/onboarding') {
       navigate('/onboarding', { replace: true })
-    } else if (onboarded && (path === '/' || path === '')) {
+    } else if (onboarded && path === '/onboarding') {
       navigate('/dashboard', { replace: true })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoaded, checking, isSignedIn, onboarded])  // NO location.pathname — would cause loop
+  }, [isLoaded, checking, isSignedIn, onboarded])
 
-  // Clerk still loading — brief spinner
+  // Clerk still loading
   if (!isLoaded) return <CheckingScreen/>
 
-  // Not signed in — redirect to sign-in
-  if (!isSignedIn) {
-    const path = window.location.pathname
-    if (!path.startsWith('/sign-in') && !path.startsWith('/sign-up')) {
-      window.location.replace('/sign-in')
-      return <CheckingScreen/>
-    }
-  }
-
-  // Signed in but gate still checking onboarding status
-  if (checking) return <CheckingScreen/>
+  // Signed in but checking onboarding status
+  if (isSignedIn && checking) return <CheckingScreen/>
 
   return (
     <ToastProvider>
       <Routes>
-        {/* Public auth */}
+        {/* ── Public routes — no auth required ── */}
+        <Route path="/" element={
+          isSignedIn
+            ? (onboarded ? null : null)  // handled by redirect above
+            : <Landing/>
+        }/>
         <Route path="/sign-in/*" element={<SignInPage/>}/>
         <Route path="/sign-up/*" element={<SignUpPage/>}/>
 
-        {/* Root */}
-        <Route path="/" element={<CheckingScreen/>}/>
+        {/* ── Auth required ── */}
+        {isSignedIn && (
+          <>
+            <Route path="/onboarding" element={<Onboarding/>}/>
+            <Route element={<Layout/>}>
+              <Route path="/dashboard" element={<Dashboard/>}/>
+              <Route path="/studio"    element={<ScriptStudio/>}/>
+              <Route path="/saved"     element={<SavedScripts/>}/>
+              <Route path="/profile"   element={<Profile/>}/>
+              <Route path="/settings"  element={<Settings/>}/>
+            </Route>
+          </>
+        )}
 
-        {/* Onboarding — user is signed in at this point */}
-        <Route path="/onboarding" element={<Onboarding/>}/>
-
-        {/* App shell — user is signed in + onboarded */}
-        <Route element={<Layout/>}>
-          <Route path="/dashboard" element={<Dashboard/>}/>
-          <Route path="/studio"    element={<ScriptStudio/>}/>
-          <Route path="/saved"     element={<SavedScripts/>}/>
-          <Route path="/profile"   element={<Profile/>}/>
-          <Route path="/settings"  element={<Settings/>}/>
-        </Route>
-
-        <Route path="*" element={<CheckingScreen/>}/>
+        {/* Catch-all: not signed in → landing, signed in → checking */}
+        <Route path="*" element={isSignedIn ? <CheckingScreen/> : <Landing/>}/>
       </Routes>
     </ToastProvider>
   )

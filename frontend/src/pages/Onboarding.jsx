@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { SignInButton } from '@clerk/clerk-react'
+import { useUser } from '@clerk/clerk-react'
 import { Icon, Wordmark, Logomark, Button, Chip, Pill, Banner, Kbd } from '../components/ui.jsx'
 import { updateNiches, completeOnboarding } from '../lib/api.js'
 import { CONTENT_FORMATS, LANGUAGE_STYLES, CREATOR_GOALS } from '../constants/platforms.js'
@@ -285,7 +285,7 @@ function Welcome({ name, answers, onLaunch }) {
     { icon:<Icon.Mic size={12}/>,        label:'Style',    val: answers.styles || '—' },
     { icon:<Icon.Target size={12}/>,     label:'Goal',     val: answers.goal || '—' },
     { icon:<Icon.Globe size={12}/>,      label:'Language', val: answers.language || '—' },
-    { icon:<Icon.Clapperboard size={12}/>, label:'Format', val: answers.format || '—' },
+    { icon:<Icon.Studio size={12}/>,       label:'Format', val: answers.format || '—' },
     { icon:<Icon.Globe size={12}/>,      label:'Platforms', val: (answers.platforms || '—').slice(0, 40) },
   ]
   return (
@@ -320,20 +320,11 @@ function Welcome({ name, answers, onLaunch }) {
 }
 
 // Helper icon (not in Icon object yet)
-function ClapperboardIcon(p) {
-  return (
-    <svg width={p.size||16} height={p.size||16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 11v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8H4z"/>
-      <path d="M4 11L2 6l4.5-1.5 2 4"/>
-      <path d="M11.5 4.5L14 9h3l-2-4.5"/>
-    </svg>
-  )
-}
-
 // ─── Main Onboarding ──────────────────────────────────────────────────────────
 
 export default function Onboarding() {
   const navigate = useNavigate()
+  const { isSignedIn } = useUser()
   const [step, setStep] = useState(0)
   const [phase, setPhase] = useState('asking')
   const [answers, setAnswers] = useState({})
@@ -416,9 +407,10 @@ export default function Onboarding() {
     <div className="min-h-screen flex flex-col bg-paper">
       <header className="h-[56px] flex items-center justify-between px-6 border-b border-line">
         <Wordmark/>
-        <SignInButton forceRedirectUrl="/onboarding">
-          <Button variant="soft" size="sm">Sign in</Button>
-        </SignInButton>
+        {/* Only show sign-in if user is NOT already authenticated */}
+        {!isSignedIn && (
+          <Button variant="soft" size="sm" onClick={() => navigate('/sign-in')}>Sign in</Button>
+        )}
       </header>
       <div className="h-[2px] bg-paper2">
         <div className="h-full bg-terra transition-all duration-500" style={{ width:`${progress * 100}%` }}/>
