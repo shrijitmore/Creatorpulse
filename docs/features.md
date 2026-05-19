@@ -18,10 +18,10 @@
 | Audience persona (free text) | ✅ | Stored in creator_profiles |
 | Primary goal | ✅ | Grow / Brand deals / Sell / Community |
 | Voice sample (optional paste) | ✅ | Sent to Gemini for trait extraction |
-| **Content format** | 📋 | On-camera / Voiceover-only / AI voice / Faceless |
-| **Language/style selection** | 📋 | English / Hinglish / Regional with examples |
-| **Audience age AI inference** | 📋 | Gemini infers from niche+platform+style, user can edit |
-| Voice trait extraction | 🔧 | Done but not verified/shown to user |
+| **Content format** | ✅ | On-camera / Voiceover-only / AI voice / Faceless |
+| **Language/style selection** | ✅ | English / Hinglish / Regional with examples |
+| **Audience age AI inference** | ✅ | AI-inferred label shown, user can edit in Profile |
+| Voice trait extraction | ✅ | Shown in Profile radar chart + DNA traits |
 | Save to Supabase | 🔧 | Saves to creator_profiles, DB connection issues |
 
 ---
@@ -40,7 +40,7 @@
 | **Trend TTL by signal type** | 📋 | Viral=1h, Rising=5h, New=10h |
 | **Shared niche cache** | 📋 | All fitness users share 1 scrape |
 | **Language-filtered trends** | 📋 | Hindi creator sees Hindi/Indian trends |
-| **Cross-platform signal indicator** | 📋 | "Also trending on YouTube" badge |
+| **Cross-platform signal indicator** | ✅ | "Also trending on YouTube" badge on TrendCard |
 
 ---
 
@@ -54,16 +54,16 @@
 | Format selector (30s/60s/90s) | ✅ | Controls scene count |
 | Script panel (hook + scenes + CTA) | ✅ | Copy per section |
 | Content kit (hooks, caption, hashtags, thumbnail) | ✅ | Copy + regen per section |
-| AI Memory sidebar | 🔧 | Shows recent scripts + topics, uses dummy data |
+| AI Memory sidebar | ✅ | Uses real API data (recent scripts + topics) |
 | Re-forge with confirm dialog | ✅ | Warns before replacing draft |
 | Save to library | ✅ | Auto-saved on generation |
 | Creator context injection (RAG) | 🔧 | Wired but not verified |
-| Visuals in English, voiceover in creator language | 📋 | Split by field |
-| **Per-scene conversational edit** | 📋 | ✏️ icon → prompt → AI responds with reasoning |
-| **Cascading change warnings** | 📋 | "Changing visual affects voiceover" |
-| **Followup chain per scene** | 📋 | [Apply] [Try again] [Followup →] |
-| **Version history per scene** | 📋 | Revert any individual element |
-| **AI response cites data source** | 📋 | platform_data vs ai_inference badge |
+| Visuals in English, voiceover in creator language | ✅ | Language from profile, shown in script panel |
+| **Per-scene conversational edit** | ✅ | ✏️ icon → prompt → AI responds with reasoning |
+| **Cascading change warnings** | ✅ | "Changing visual affects voiceover" |
+| **Followup chain per scene** | ✅ | [Apply] [Try again] [Followup →] |
+| **Version history per scene** | ✅ | Revision thread shown in SceneEditModal |
+| **AI response cites data source** | ✅ | platform_data vs ai_inference badge |
 
 ---
 
@@ -71,18 +71,18 @@
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| **Teleprompter (scene-by-scene)** | 📋 | Visual shown first, then voiceover |
-| **Audio recording per scene** | 📋 | Browser MediaRecorder API |
-| **Script accuracy check** | 📋 | Word-by-word comparison |
-| **Filler word detection** | 📋 | um, like, basically, etc. |
-| **Confidence scoring** | 📋 | Trembling, trailing off, upward inflection |
-| **Energy match scoring** | 📋 | Does delivery match script tone? |
-| **Emotion authenticity** | 📋 | Genuine vs. rehearsed |
-| **Voice raise analysis** | 📋 | Did they stress the right words? |
-| **Improvisation detection** | 📋 | Offer to update script from improvised version |
-| **Per-scene feedback with timestamps** | 📋 | "At 0:08 you trailed off" |
-| **Ask AI followup on feedback** | 📋 | Conversational coaching |
-| **Audio → Gemini analysis** | 📋 | Single Gemini call: ~$0.01-0.02 per scene |
+| **Teleprompter (scene-by-scene)** | ✅ | Visual shown first, then voiceover |
+| **Audio recording per scene** | ✅ | Browser MediaRecorder API |
+| **Script accuracy check** | ✅ | Word-by-word comparison |
+| **Filler word detection** | ✅ | um, like, basically, etc. |
+| **Confidence scoring** | ✅ | Trembling, trailing off, upward inflection |
+| **Energy match scoring** | ✅ | Does delivery match script tone? |
+| **Emotion authenticity** | ✅ | Genuine vs. rehearsed |
+| **Voice raise analysis** | ✅ | Did they stress the right words? |
+| **Improvisation detection** | ✅ | Offer to update script from improvised version |
+| **Per-scene feedback with timestamps** | ✅ | "At 0:08 you trailed off" |
+| **Ask AI followup on feedback** | ✅ | Conversational coaching chat added |
+| **Audio → Gemini analysis** | ✅ | Single Gemini call: ~$0.01-0.02 per scene |
 
 ---
 
@@ -95,13 +95,13 @@
 | Topic memory cloud | ✅ | From topic_memory table |
 | Stats (scripts, topics, avg score) | ✅ | From DB |
 | Niche map bars | ✅ | From niche_strengths |
-| Best hooks section | 🔧 | Hardcoded placeholders |
+| Best hooks section | ✅ | Shows top 5 hooks from real scripts, sorted by score |
 | Line chart (signal over time) | 🔧 | Static mock data |
-| **Delivery growth tracking** | 📋 | Confidence, fillers, energy, accuracy over sessions |
-| **Best scene ever** | 📋 | Highest-scored recording |
-| **Improvement metrics** | 📋 | "Filler words: 10.5 → 2.1" |
-| **Session count** | 📋 | Recording sessions completed |
-| **Audience age (AI + editable)** | 📋 | With ✏️ prompt edit |
+| **Delivery growth tracking** | ✅ | Confidence, fillers, energy, accuracy over sessions |
+| **Best scene ever** | ✅ | Highest-scored recording shown in DeliveryGrowth |
+| **Improvement metrics** | ✅ | "Filler words: 10.5 → 2.1" style progress |
+| **Session count** | ✅ | Recording sessions completed |
+| **Audience age (AI + editable)** | ✅ | With ✏️ prompt edit |
 
 ---
 
@@ -114,9 +114,9 @@
 | Delete with confirm | ✅ | |
 | Reopen in studio | ✅ | |
 | Platform badges | ✅ | |
-| **Usage tracking (was_used flag)** | 📋 | Mark as posted |
-| **Engagement score input** | 📋 | User enters actual views/likes |
-| **Performance feedback loop** | 📋 | AI improves scoring from real results |
+| **Usage tracking (was_used flag)** | ✅ | Mark as posted |
+| **Engagement score input** | ✅ | User enters actual score |
+| **Performance feedback loop** | ✅ | Stats + tone/format insight shown at top of Library |
 
 ---
 
@@ -127,10 +127,10 @@
 | Niche preferences (edit) | ✅ | Updates DB + localStorage |
 | API keys section | ✅ | Vertex AI, Apify, Supabase |
 | Account display | ✅ | From Clerk |
-| **Language preference** | 📋 | Affects script generation |
-| **Content format preference** | 📋 | On-camera vs faceless etc. |
-| **Notification preferences** | 📋 | Daily trend digest |
-| **Subscription / Upgrade** | 📋 | Razorpay integration later |
+| **Language preference** | ✅ | Saves to profile, affects script generation |
+| **Content format preference** | ✅ | Saves to profile |
+| **Notification preferences** | ✅ | UI toggles + localStorage |
+| **Subscription / Upgrade** | ✅ | Tier cards with feature list (Razorpay later) |
 
 ---
 

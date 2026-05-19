@@ -5,6 +5,75 @@ import { getSavedScripts, deleteScript } from '../lib/api.js'
 import { getAuthHeaders } from '../lib/apiClient.js'
 import { NICHES } from '../lib/mockData.js'
 
+function PerformanceFeedback({ scripts }) {
+  const posted = scripts.filter(s => s.wasUsed)
+  const withScore = scripts.filter(s => s.engagementScore != null)
+
+  if (scripts.length < 3 || posted.length === 0) return null
+
+  const avgScore = withScore.length
+    ? Math.round(withScore.reduce((a, s) => a + s.engagementScore, 0) / withScore.length)
+    : null
+
+  const byTone = {}
+  for (const s of withScore) {
+    if (!byTone[s.tone]) byTone[s.tone] = []
+    byTone[s.tone].push(s.engagementScore)
+  }
+  const toneAvgs = Object.entries(byTone)
+    .map(([tone, scores]) => ({ tone, avg: Math.round(scores.reduce((a,b) => a+b,0) / scores.length) }))
+    .sort((a,b) => b.avg - a.avg)
+
+  const byFormat = {}
+  for (const s of withScore) {
+    if (!byFormat[s.format]) byFormat[s.format] = []
+    byFormat[s.format].push(s.engagementScore)
+  }
+  const bestFormat = Object.entries(byFormat)
+    .map(([format, scores]) => ({ format, avg: Math.round(scores.reduce((a,b) => a+b,0) / scores.length) }))
+    .sort((a,b) => b.avg - a.avg)[0]
+
+  return (
+    <div className="card p-4 mb-5 border-l-[3px]" style={{ borderLeftColor:'var(--terra)' }}>
+      <div className="flex items-center gap-2 mb-3">
+        <Icon.Bolt size={14} style={{ color:'var(--terra)' }}/>
+        <p className="text-[13px] font-semibold text-ink">Performance feedback loop</p>
+        <Chip tone="success">{posted.length} posted</Chip>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+        {[
+          { label:'Scripts posted', value: posted.length },
+          { label:'With score', value: withScore.length },
+          { label:'Avg score', value: avgScore != null ? `${avgScore}/100` : '—' },
+          { label:'Best tone', value: toneAvgs[0]?.tone || '—' },
+        ].map(s => (
+          <div key={s.label} className="rounded-lg border border-line bg-paper p-2.5 text-center">
+            <p className="text-[18px] font-semibold text-ink leading-none">{s.value}</p>
+            <p className="text-[10.5px] text-ink3 uppercase tracking-[0.06em] font-medium mt-0.5">{s.label}</p>
+          </div>
+        ))}
+      </div>
+      {(toneAvgs.length > 0 || bestFormat) && (
+        <div className="text-[12.5px] text-ink2 space-y-1 pt-2 border-t border-line">
+          {toneAvgs[0] && (
+            <p>
+              <Icon.Sparkle size={11} style={{ color:'var(--terra)', display:'inline', marginRight:4 }}/>
+              <strong>{toneAvgs[0].tone}</strong> tone gets your highest scores ({toneAvgs[0].avg} avg)
+              {toneAvgs.length > 1 && ` · ${toneAvgs[toneAvgs.length-1].tone} gets the lowest`}
+            </p>
+          )}
+          {bestFormat && (
+            <p>
+              <Icon.Clock size={11} style={{ color:'var(--ink3)', display:'inline', marginRight:4 }}/>
+              <strong>{bestFormat.format}</strong> reels perform best for you ({bestFormat.avg} avg score)
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const NICHE_ICON = Object.fromEntries(NICHES.map(n => [n.id, n.icon]))
 
 function timeAgo(dateStr) {
@@ -86,9 +155,9 @@ function ScriptRow({ script, onDelete, onOpen }) {
           <span className="text-[11.5px] text-ink3 uppercase tracking-[0.06em] font-medium">{niche?.label || script.niche}</span>
           <span className="text-ink4">·</span>
           <span className="text-[11.5px] text-ink3 capitalize">{script.tone}</span>
-          {script.was_used && <Chip tone="success">Posted</Chip>}
-          {script.engagement_score && (
-            <span className="text-[11px] font-mono text-terra">{script.engagement_score} score</span>
+          {script.wasUsed && <Chip tone="success">Posted</Chip>}
+          {script.engagementScore && (
+            <span className="text-[11px] font-mono text-terra">{script.engagementScore} score</span>
           )}
         </div>
       </div>
@@ -176,6 +245,8 @@ export default function SavedScripts() {
           </Button>
         }
       />
+
+      {!loading && scripts.length > 0 && <PerformanceFeedback scripts={scripts}/>}
 
       {/* Filters */}
       <div className="mt-6 flex flex-wrap items-center gap-3">

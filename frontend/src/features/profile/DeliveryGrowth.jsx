@@ -83,13 +83,57 @@ export default function DeliveryGrowth() {
   const firstFillers = sessions[0]?.filler_count || 0
   const lastFillers = sessions[sessions.length-1]?.filler_count || 0
 
+  // Best scene — session with highest overall score
+  const bestSession = sessions.reduce((best, s) => (s.overall_score > (best?.overall_score || 0) ? s : best), null)
+  const latestScore = sessions[sessions.length - 1]?.overall_score || 0
+  const firstScore = sessions[0]?.overall_score || 0
+  const scoreImproved = latestScore > firstScore
+
   return (
     <div className="space-y-4">
-      {/* Session count banner */}
+      {/* Session count + improvement banner */}
       <div className="flex items-center justify-between text-[12px]">
         <span className="text-ink3">{sessions.length} session{sessions.length !== 1 ? 's' : ''} recorded</span>
-        <Chip tone="success" icon={<Icon.Rising size={10}/>}>Improving</Chip>
+        <Chip tone={scoreImproved ? 'success' : 'line'} icon={scoreImproved ? <Icon.Rising size={10}/> : null}>
+          {scoreImproved ? 'Improving' : 'Steady'}
+        </Chip>
       </div>
+
+      {/* Improvement metrics */}
+      {sessions.length >= 2 && (
+        <div className="rounded-lg border border-line bg-paper p-3 space-y-1.5">
+          <p className="text-[10.5px] text-ink3 uppercase tracking-[0.06em] font-medium mb-2">Progress since session 1</p>
+          {[
+            { label:'Overall score',  from: firstScore.toFixed(1), to: latestScore.toFixed(1), up: latestScore >= firstScore },
+            { label:'Filler words',   from: String(firstFillers),  to: String(lastFillers),    up: lastFillers <= firstFillers },
+          ].map(m => (
+            <div key={m.label} className="flex items-center justify-between text-[12px]">
+              <span className="text-ink3">{m.label}</span>
+              <span className="font-mono flex items-center gap-1">
+                <span className="text-ink3">{m.from}</span>
+                <span className="text-ink4">→</span>
+                <span style={{ color: m.up ? 'var(--success)' : 'var(--error)', fontWeight:600 }}>{m.to}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Best scene ever */}
+      {bestSession && (
+        <div className="rounded-lg border border-line p-3" style={{ background:'var(--terrasoft)' }}>
+          <p className="text-[10.5px] text-ink3 uppercase tracking-[0.06em] font-medium mb-1.5">Best scene ever</p>
+          <div className="flex items-center gap-3">
+            <span className="text-[28px] font-semibold tracking-tight" style={{ color:'var(--terra)' }}>
+              {bestSession.overall_score}/10
+            </span>
+            <div className="text-[12px] text-ink2">
+              <p>Scene {bestSession.scene_number || '—'}</p>
+              <p className="text-ink3">{new Date(bestSession.created_at).toLocaleDateString('en-US', { month:'short', day:'numeric' })}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Score charts */}
       <div className="grid grid-cols-2 gap-3">

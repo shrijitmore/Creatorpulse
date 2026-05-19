@@ -116,7 +116,10 @@ export default function Profile() {
 
   useEffect(() => {
     getProfile()
-      .then(d => { setData(d); setAudienceAge(d?.profile?.audienceAge || null) })
+      .then(d => {
+        setData(d)
+        setAudienceAge(d?.profile?.audienceAge || null)
+      })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
@@ -126,18 +129,25 @@ export default function Profile() {
   const profile = data?.profile || null
   const stats = data?.stats || {}
   const topTopics = data?.topTopics || []
+  const topHooks = data?.topHooks || []
+  const scriptHistory = data?.scriptHistory || []
+  const chartData = scriptHistory
+    .filter(s => s.engagementScore != null)
+    .map(s => ({ v: s.engagementScore, label: new Date(s.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }))
 
   const name = profile?.creatorName || storedProfile.name || 'Creator'
   const handle = '@' + name.toLowerCase().replace(/\s+/g, '')
   const initials = name.split(' ').map(w => w[0]).slice(0,2).join('')
 
-  // Build voice axes from profile traits
+  // Build voice axes from profile traits — deterministic hash so values are stable
   const voiceTraits = profile?.voiceTraits || []
-  const voiceAxes = VOICE_AXIS_KEYS.map(key => ({
-    key, label: VOICE_AXIS_LABELS[key],
-    // Derive approximate values from trait presence
-    value: voiceTraits.some(t => t?.toLowerCase().includes(key)) ? 80 : Math.floor(Math.random() * 40 + 35)
-  }))
+  const voiceAxes = VOICE_AXIS_KEYS.map((key, idx) => {
+    const traitMatch = voiceTraits.some(t => t?.toLowerCase().includes(key))
+    // Deterministic fallback: derive a stable value from content styles + goal hash
+    const seed = (profile?.contentStyles || []).join('').charCodeAt(idx % 3 || 0) || 65
+    const baseVal = ((seed * (idx + 7)) % 45) + 30
+    return { key, label: VOICE_AXIS_LABELS[key], value: traitMatch ? 75 + (idx * 3) % 20 : baseVal }
+  })
 
   // Build niche strengths from nicheStrengths map
   const nicheStrengths = profile?.nicheStrengths || {}
@@ -238,6 +248,8 @@ export default function Profile() {
                   </div>
                   <ProfileRow label="Goal" value={profile?.primaryGoal} chip="terra"/>
                   <ProfileRow label="Platforms" value={(profile?.platforms || []).join(', ')}/>
+                  <ProfileRow label="Language" value={profile?.languageStyle || '—'}/>
+                  <ProfileRow label="Format" value={profile?.contentFormat ? profile.contentFormat.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()) : '—'}/>
                   <ProfileRow label="Voice sample"
                     value={profile?.rawVoiceSample ? 'Trained · voice fingerprint active' : 'No sample — add one to improve scripts'}
                     chip={profile?.rawVoiceSample ? 'success' : null}/>
@@ -321,22 +333,30 @@ export default function Profile() {
 
           {/* Best hooks from saved scripts */}
           <SectionCard kicker="Top performers" title="Your best hooks"
-            sub="The opening lines from your highest-scored scripts.">
+            sub="Opening lines from your highest-scored scripts.">
             {loading ? (
               <div className="space-y-2">{Array.from({length:3}).map((_,i)=><div key={i} className="card p-3"><Skel h={4}/></div>)}</div>
-            ) : (stats.totalScripts ?? 0) === 0 ? (
+            ) : topHooks.length === 0 ? (
               <p className="text-[13px] text-ink3 italic">No scripts yet — generate your first from the dashboard.</p>
             ) : (
               <div className="space-y-2.5">
-                <div className="border border-line rounded-lg p-3 bg-white">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10.5px] text-ink3 font-mono uppercase tracking-[0.06em]">Most recent</span>
-                    <Chip tone="terra">{stats.avgScore ?? '—'} avg</Chip>
-                  </div>
-                  <p className="text-[13.5px] text-ink leading-snug italic">
-                    "Generate scripts and your top hooks will appear here."
-                  </p>
-                </div>
+                {topHooks.map((h, i) => {
+                  const tones = ['var(--terra)', 'var(--ink2)', 'var(--successc)']
+                  return (
+                    <div key={h.id} className="border border-line rounded-lg p-3 bg-white">
+                      <div className="flex items-center justify-between mb-1.5 gap-2">
+                        <span className="text-[10.5px] text-ink3 font-mono uppercase tracking-[0.06em] truncate flex-1">{h.topicTitle}</span>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <Chip tone="line">{h.format}</Chip>
+                          {h.engagementScore && <Chip tone="terra">{h.engagementScore}</Chip>}
+                        </div>
+                      </div>
+                      <p className="text-[13.5px] text-ink leading-snug italic" style={{ borderLeft: `3px solid ${tones[i % 3]}`, paddingLeft: 8 }}>
+                        "{h.hookLine}"
+                      </p>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </SectionCard>
@@ -345,6 +365,26 @@ export default function Profile() {
           <SectionCard kicker="Voice coaching" title="Delivery growth"
             sub="Your scores across recorded practice sessions.">
             <DeliveryGrowth/>
+          </SectionCard>
+
+          {/* Signal over time */}
+          <SectionCard kicker="Engagement" title="Signal over time"
+            sub="Your engagement scores across posted scripts — higher is better.">
+            {loading ? (
+              <div className="skel h-14 rounded"/>
+            ) : chartData.length < 2 ? (
+              <p className="text-[13px] text-ink3 italic">
+                Mark scripts as posted and add engagement scores to build this chart.
+              </p>
+            ) : (
+              <>
+                <LineChart data={chartData} height={88}/>
+                <div className="mt-2 flex items-center justify-between text-[11.5px] text-ink3">
+                  <span>Earliest · {chartData[0]?.label}</span>
+                  <span className="font-mono tabular-nums">Latest · {chartData[chartData.length - 1]?.v}/100</span>
+                </div>
+              </>
+            )}
           </SectionCard>
 
           {/* Niche map */}

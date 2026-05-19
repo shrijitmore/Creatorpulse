@@ -9,6 +9,7 @@ import { generateCopyKit } from './hookCopy.js'
 const trendStateChannels = {
   niches: { value: (a, b) => b ?? a, default: () => [] },
   platforms: { value: (a, b) => b ?? a, default: () => [] },
+  userCtx: { value: (a, b) => b ?? a, default: () => ({}) },
   rawTrends: { value: (a, b) => b ?? a, default: () => [] },
   trends: { value: (a, b) => b ?? a, default: () => [] },
   recommendations: { value: (a, b) => b ?? a, default: () => [] },
@@ -18,7 +19,7 @@ const trendStateChannels = {
 async function scrapeNode(state) {
   console.log('[pipeline:trend] Running scrape node')
   try {
-    const rawTrends = await scrapeTrends(state.niches, state.platforms)
+    const rawTrends = await scrapeTrends(state.niches, state.platforms, state.userCtx)
     return { rawTrends }
   } catch (err) {
     console.error('[pipeline:trend] Scrape node error:', err.message)
@@ -56,9 +57,9 @@ function buildTrendGraph() {
  * @param {string[]} platforms
  * @returns {Promise<{ trends: Trend[], recommendations: Trend[] }>}
  */
-export async function runTrendPipeline(niches, platforms) {
+export async function runTrendPipeline(niches, platforms, userCtx = {}) {
   const compiled = buildTrendGraph()
-  const result = await compiled.invoke({ niches, platforms })
+  const result = await compiled.invoke({ niches, platforms, userCtx })
   return {
     trends: result.trends || [],
     recommendations: result.recommendations || []

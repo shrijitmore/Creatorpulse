@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react'
 import { Icon, Button, Chip, Modal } from '../../components/ui.jsx'
+import { getAuthHeaders } from '../../lib/apiClient.js'
 
 const SCORE_COLOR = (s) => s >= 8 ? 'var(--success)' : s >= 6 ? 'var(--terra)' : 'var(--error)'
 const SCORE_LABEL = (s) => s >= 8 ? 'Strong' : s >= 6 ? 'Good' : 'Needs work'
@@ -14,6 +15,9 @@ export default function RecordingStudio({ open, onClose, script }) {
   const [recordings, setRecordings] = useState({})    // sceneNumber → { blob, feedback }
   const [currentFeedback, setCurrentFeedback] = useState(null)
   const [followupText, setFollowupText] = useState('')
+  const [coachQuestion, setCoachQuestion] = useState('')
+  const [coachAnswer, setCoachAnswer] = useState(null)
+  const [coachLoading, setCoachLoading] = useState(false)
   const [error, setError] = useState(null)
 
   const mediaRecorderRef = useRef(null)
@@ -101,12 +105,36 @@ export default function RecordingStudio({ open, onClose, script }) {
     reader.readAsDataURL(blob)
   }, [scene, script])
 
-  // Get token from Clerk (stored by TokenRegistrar in App.jsx via apiClient)
+  const askCoach = useCallback(async () => {
+    if (!coachQuestion.trim() || !currentFeedback) return
+    setCoachLoading(true)
+    setCoachAnswer(null)
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch('/api/scene/followup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({
+          previousSuggestion: JSON.stringify(currentFeedback),
+          followupPrompt: coachQuestion.trim(),
+          element: 'delivery',
+          tone: script?.tone,
+          niche: script?.niche,
+        })
+      })
+      const data = await res.json()
+      setCoachAnswer(data.data?.suggestion || data.suggestion || 'No suggestion returned.')
+    } catch {
+      setCoachAnswer('Could not reach the AI coach. Check your connection.')
+    } finally {
+      setCoachLoading(false)
+    }
+  }, [coachQuestion, currentFeedback, script])
+
   const getToken = async () => {
     try {
-      const { getAuthHeaders } = await import('../../lib/apiClient.js')
       const headers = await getAuthHeaders()
-      return headers.Authorization?.replace('Bearer ', '') || ''
+      return (headers.Authorization || '').replace('Bearer ', '')
     } catch { return '' }
   }
 
@@ -116,6 +144,7 @@ export default function RecordingStudio({ open, onClose, script }) {
     setCurrentFeedback(null)
     setPhase('teleprompter')
     setRecordingTime(0)
+    setCoachQuestion(''); setCoachAnswer(null)
     if (!isLastScene) setSceneIdx(i => i + 1)
     else setPhase('done')
   }
@@ -124,6 +153,7 @@ export default function RecordingStudio({ open, onClose, script }) {
     setCurrentFeedback(null)
     setPhase('teleprompter')
     setRecordingTime(0)
+    setCoachQuestion(''); setCoachAnswer(null)
   }
 
   const handleClose = () => {
@@ -334,6 +364,33 @@ export default function RecordingStudio({ open, onClose, script }) {
               <Button variant="soft" icon={<Icon.Refresh size={13}/>} onClick={reRecord}>
                 Re-record this scene
               </Button>
+            </div>
+
+            {/* Ask AI coach */}
+            <div className="border-t border-line pt-3">
+              <p className="text-[11.5px] font-semibold text-ink2 mb-2 flex items-center gap-1.5">
+                <Icon.Brain size={12}/> Ask your AI coach
+              </p>
+              <div className="flex items-end gap-2">
+                <input
+                  value={coachQuestion}
+                  onChange={e => { setCoachQuestion(e.target.value); setCoachAnswer(null) }}
+                  onKeyDown={e => e.key === 'Enter' && askCoach()}
+                  className="field flex-1 text-[13px]"
+                  placeholder='e.g. "How do I sound less rehearsed?" or "What should I fix first?"'
+                />
+                <Button variant="soft" size="sm"
+                  icon={coachLoading ? <Icon.Refresh size={12} className="spin"/> : <Icon.Send size={12}/>}
+                  disabled={!coachQuestion.trim() || coachLoading}
+                  onClick={askCoach}>
+                  {coachLoading ? '' : 'Ask'}
+                </Button>
+              </div>
+              {coachAnswer && (
+                <div className="mt-2.5 rounded-lg p-3 border border-line bg-paper fade-in">
+                  <p className="text-[12.5px] text-ink2 leading-relaxed">{coachAnswer}</p>
+                </div>
+              )}
             </div>
           </div>
         )}

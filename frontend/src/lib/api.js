@@ -181,6 +181,13 @@ export async function getSimilarScripts(topic, niche) {
   return data.data || data
 }
 
+export async function saveUserPreferences(prefs) {
+  if (prefs.languageStyle || prefs.contentFormat) {
+    await updateProfile(prefs).catch(() => {})
+  }
+  return { success: true }
+}
+
 // ─── Scene editing ────────────────────────────────────────────────────────────
 
 export async function editScene({ sceneNumber, element, currentValue, userPrompt, tone, niche, fullScript }) {

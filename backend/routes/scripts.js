@@ -183,7 +183,10 @@ router.get('/', async (req, res) => {
       id: row.id, topicId: row.topic_id, topicTitle: row.topic_title,
       tone: row.tone, format: row.format, hookLine: row.hook_line,
       scenes: typeof row.scenes === 'string' ? JSON.parse(row.scenes) : (row.scenes || []),
-      cta: row.cta, niche: row.niche, platform: row.platform, createdAt: row.created_at
+      cta: row.cta, niche: row.niche, platform: row.platform,
+      wasUsed: row.was_used || false,
+      engagementScore: row.engagement_score || null,
+      createdAt: row.created_at
     }))
 
     res.json({ success: true, data: scripts })

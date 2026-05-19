@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { runTrendPipeline } from '../agents/pipeline.js'
 import { requireAuth } from '../lib/auth.js'
+import { getCreatorProfile } from '../lib/memory.js'
 import { getDb } from '../db.js'
 import { CACHE_TTL } from '../constants.js'
 
@@ -37,6 +38,19 @@ async function getUserNiches(userId) {
   return []
 }
 
+async function getUserContext(userId) {
+  try {
+    const profile = await getCreatorProfile(userId)
+    if (!profile) return {}
+    const platforms = Array.isArray(profile.platforms) ? profile.platforms : []
+    const primaryPlatform = platforms[0]?.toLowerCase().replace(/\s.*/, '') || null
+    return {
+      primaryPlatform,
+      languageStyle: profile.language_style || 'English',
+    }
+  } catch { return {} }
+}
+
 // GET /api/trends
 router.get('/', async (req, res) => {
   try {
@@ -44,7 +58,11 @@ router.get('/', async (req, res) => {
       ? req.query.niches.split(',').map(s => s.trim()).filter(Boolean)
       : []
 
-    const niches = queryNiches.length > 0 ? queryNiches : await getUserNiches(req.userId)
+    const [niches, userCtx] = await Promise.all([
+      queryNiches.length > 0 ? Promise.resolve(queryNiches) : getUserNiches(req.userId),
+      getUserContext(req.userId),
+    ])
+
     const redis = req.app.locals.redis
 
     // Check shared niche cache first
@@ -54,9 +72,12 @@ router.get('/', async (req, res) => {
         const cached = await redis.get(sharedKey)
         if (cached) {
           console.log(`[trends] Shared cache hit: ${sharedKey}`)
+          const parsed = JSON.parse(cached)
+          // Personalise cached result by language without re-scraping
+          const personalised = filterByLanguage(parsed, userCtx.languageStyle)
           return res.json({
             success: true,
-            data: JSON.parse(cached),
+            data: personalised,
             meta: { cached: true, processingMs: 0, sharedCache: true }
           })
         }
@@ -64,11 +85,11 @@ router.get('/', async (req, res) => {
     }
 
     const start = Date.now()
-    const { trends, recommendations } = await runTrendPipeline(niches, [])
+    const { trends, recommendations } = await runTrendPipeline(niches, [], userCtx)
     const processingMs = Date.now() - start
     const result = { trends, recommendations }
 
-    // Cache with dynamic TTL based on signal composition
+    // Cache raw (unfiltered) result — personalisation applied per-request after cache hit
     if (redis) {
       try {
         const ttl = getTTL(trends)
@@ -88,17 +109,19 @@ router.get('/', async (req, res) => {
 router.post('/refresh', async (req, res) => {
   try {
     const { niches: bodyNiches = [] } = req.body
-    const niches = bodyNiches.length > 0 ? bodyNiches : await getUserNiches(req.userId)
+    const [niches, userCtx] = await Promise.all([
+      bodyNiches.length > 0 ? Promise.resolve(bodyNiches) : getUserNiches(req.userId),
+      getUserContext(req.userId),
+    ])
     const redis = req.app.locals.redis
     const sharedKey = nicheCacheKey(niches)
 
-    // Invalidate shared cache for these niches
     if (redis) {
       try { await redis.del(sharedKey) } catch {}
     }
 
     const start = Date.now()
-    const { trends, recommendations } = await runTrendPipeline(niches, [])
+    const { trends, recommendations } = await runTrendPipeline(niches, [], userCtx)
     const processingMs = Date.now() - start
     const result = { trends, recommendations }
 
@@ -116,5 +139,23 @@ router.post('/refresh', async (req, res) => {
     res.status(500).json({ success: false, error: { code: 'REFRESH_ERROR', message: err.message } })
   }
 })
+
+// ── Language personalisation (post-cache) ─────────────────────────────────────
+
+const REGIONAL_KEYWORDS = {
+  hindi:    ['india', 'indian', 'desi', 'bollywood', 'rupee', 'crore', 'lakh', 'ipl'],
+  hinglish: ['india', 'indian', 'desi', 'bhai', 'yaar'],
+  regional: ['india', 'indian', 'desi'],
+}
+
+function filterByLanguage(result, languageStyle) {
+  const lang = (languageStyle || 'english').toLowerCase()
+  if (lang === 'english') return result  // no filtering needed
+  const keywords = REGIONAL_KEYWORDS[lang] || REGIONAL_KEYWORDS.regional
+  const boost = t => keywords.some(k => t.title?.toLowerCase().includes(k) || t.summary?.toLowerCase().includes(k))
+  const boosted = (result.trends || []).map(t => boost(t) ? { ...t, score: Math.min(99, t.score + 8) } : t)
+    .sort((a, b) => b.score - a.score)
+  return { ...result, trends: boosted }
+}
 
 export default router

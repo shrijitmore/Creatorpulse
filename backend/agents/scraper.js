@@ -45,14 +45,16 @@ function extractTitle(caption, niche) {
   return (first.length > 10 ? first : clean).slice(0, 100)
 }
 
-function isSpamItem(item) {
+function isSpamItem(item, allowRegional = false) {
   const caption = (item.caption || '').toLowerCase()
   const title = extractTitle(item.caption, '')
   if (title.length < 10) return true
   if (/submit.*paper|call.*paper|conference|webinar|register.*now/i.test(caption)) return true
-  // Filter non-English: >30% non-ASCII chars = foreign language post
-  const nonAscii = (title.match(/[^\x00-\x7F]/g) || []).length
-  if (nonAscii / title.length > 0.3) return true
+  // Only filter non-ASCII for English creators — Hindi/Hinglish creators want regional content
+  if (!allowRegional) {
+    const nonAscii = (title.match(/[^\x00-\x7F]/g) || []).length
+    if (nonAscii / title.length > 0.3) return true
+  }
   // Filter CTA-only titles that leaked into extraction
   if (/^(comment|tag|follow|click|link in bio|dm me|check this|shop now|buy now)/i.test(title.trim())) return true
   return false
@@ -60,15 +62,15 @@ function isSpamItem(item) {
 
 // ── Main scraper ──────────────────────────────────────────────────────────────
 
-export async function scrapeTrends(niches, platforms) {
+export async function scrapeTrends(niches, platforms, userCtx = {}) {
   const activeNiches = niches?.length > 0 ? niches : NICHES_DEFAULT
   const targetPlatforms = platforms?.length > 0 ? platforms.filter(p => p !== 'x') : ['instagram', 'reddit', 'youtube']
   const results = []
 
   // Run all scrapers in parallel
   await Promise.all([
-    scrapeInstagram(activeNiches, targetPlatforms, results),
-    scrapeYouTube(activeNiches, targetPlatforms, results),
+    scrapeInstagram(activeNiches, targetPlatforms, results, userCtx),
+    scrapeYouTube(activeNiches, targetPlatforms, results, userCtx),
     scrapeReddit(activeNiches, targetPlatforms, results),
   ])
 
@@ -78,18 +80,27 @@ export async function scrapeTrends(niches, platforms) {
 
 // ── Instagram (session cookie) ────────────────────────────────────────────────
 
-async function scrapeInstagram(niches, platforms, results) {
+async function scrapeInstagram(niches, platforms, results, userCtx = {}) {
   if (!platforms.includes('instagram')) return
   const sessionId = decodeURIComponent(process.env.INSTAGRAM_SESSION_ID || '')
   const csrfToken = process.env.INSTAGRAM_CSRF_TOKEN || ''
 
+  // Platform weighting: primary platform gets 60% of scraping budget
+  const isPrimary = userCtx.primaryPlatform === 'instagram'
+  const allowRegional = ['hindi', 'hinglish'].includes((userCtx.languageStyle || '').toLowerCase())
+
   if (!sessionId) {
     console.log('[scraper] Instagram: no session cookie — using Apify fallback')
-    return scrapeInstagramApify(niches, platforms, results)
+    return scrapeInstagramApify(niches, platforms, results, allowRegional)
   }
 
-  const hashtags = niches.slice(0, 4).flatMap(n => (NICHE_IG_HASHTAGS[n] || [n]).slice(0, 2)).slice(0, 6)
-  console.log(`[scraper] Instagram searching: ${hashtags.slice(0,4).join(', ')}`)
+  const hashtagsPerNiche = isPrimary ? 3 : 2
+  const maxHashtags = isPrimary ? 9 : 6
+  const loopLimit = isPrimary ? 6 : 4
+  const hashtags = niches.slice(0, isPrimary ? 5 : 4)
+    .flatMap(n => (NICHE_IG_HASHTAGS[n] || [n]).slice(0, hashtagsPerNiche))
+    .slice(0, maxHashtags)
+  console.log(`[scraper] Instagram searching: ${hashtags.slice(0, loopLimit).join(', ')} (${isPrimary ? 'primary platform' : 'standard'})`)
 
   const igHeaders = {
     'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
@@ -102,7 +113,7 @@ async function scrapeInstagram(niches, platforms, results) {
   }
 
   let scraped = 0
-  for (const hashtag of hashtags.slice(0, 4)) {
+  for (const hashtag of hashtags.slice(0, loopLimit)) {
     try {
       await new Promise(r => setTimeout(r, 1500 + Math.random() * 1000))  // respectful delay
 
@@ -141,7 +152,7 @@ async function scrapeInstagram(niches, platforms, results) {
           ) || niches[0]
 
           const item = { caption, timestamp, type, hashtags: postHashtags, likeCount }
-          if (isSpamItem(item)) continue
+          if (isSpamItem(item, allowRegional)) continue
 
           const score = scoreInstagramPost({ ...item, likeCount, commentCount })
           const title = extractTitle(caption, matchedNiche)
@@ -193,7 +204,7 @@ async function scrapeInstagram(niches, platforms, results) {
   }
 }
 
-async function scrapeInstagramApify(niches, platforms, results) {
+async function scrapeInstagramApify(niches, platforms, results, allowRegional = false) {
   if (!process.env.APIFY_API_KEY) return
   const hashtags = niches.slice(0, 4).flatMap(n => (NICHE_IG_HASHTAGS[n] || [n]).slice(0, 1))
   try {
@@ -209,7 +220,7 @@ async function scrapeInstagramApify(niches, platforms, results) {
     if (!runRes.ok) return
     const items = await runRes.json()
     if (!Array.isArray(items)) return
-    const scored = items.filter(item => !isSpamItem(item)).map(item => {
+    const scored = items.filter(item => !isSpamItem(item, allowRegional)).map(item => {
       const postHashtags = (item.hashtags || []).map(h => h.toLowerCase())
       const matchedNiche = niches.find(n => (NICHE_IG_HASHTAGS[n] || [n]).some(h => postHashtags.includes(h))) || niches[0]
       const score = scoreInstagramPost(item)
@@ -224,17 +235,20 @@ async function scrapeInstagramApify(niches, platforms, results) {
 
 // ── YouTube Data API ──────────────────────────────────────────────────────────
 
-async function scrapeYouTube(niches, platforms, results) {
+async function scrapeYouTube(niches, platforms, results, userCtx = {}) {
   if (!platforms.includes('youtube') && !platforms.includes('all') && platforms.length > 0 && !platforms.includes('instagram')) {
     // Only skip if explicitly filtering to non-youtube platforms
   }
   const key = process.env.YOUTUBE_API_KEY
   if (!key) { console.log('[scraper] YouTube: no API key'); return }
 
+  const isPrimary = userCtx.primaryPlatform === 'youtube'
+  const nicheLimit = isPrimary ? 6 : 4
+
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600000).toISOString()
   let ytCount = 0
 
-  await Promise.all(niches.slice(0, 4).map(async niche => {
+  await Promise.all(niches.slice(0, nicheLimit).map(async niche => {
     try {
       const cat = NICHE_YT_CATEGORIES[niche] || { id: '0', query: niche }
 
