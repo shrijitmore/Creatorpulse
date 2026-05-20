@@ -95,6 +95,10 @@ export function extractJson(text) {
 
   let str = typeof text === 'string' ? text : JSON.stringify(text)
 
+  // Strip Gemini 2.5 thinking tags (thinking content bleeds in when budget > 0)
+  str = str.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '').trim()
+  str = str.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
+
   // Strip markdown code fences (closed or unclosed — handles truncated responses)
   str = str.replace(/```(?:json)?\s*([\s\S]*?)```/g, '$1').trim()
   // Handle unclosed fence (truncated): strip opening fence only

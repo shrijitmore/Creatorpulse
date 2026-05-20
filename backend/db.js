@@ -99,6 +99,12 @@ async function runMigrations(db) {
       updated_at       TIMESTAMPTZ DEFAULT NOW()
     )`,
 
+    // Add missing columns to users (handles old PGlite DBs missing these)
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS name TEXT`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS niches TEXT[]`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_id TEXT`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`,
+
     // Add new columns to existing table (safe if already exists)
     `ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS content_format TEXT DEFAULT 'on-camera'`,
     `ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS language_style TEXT DEFAULT 'English'`,
