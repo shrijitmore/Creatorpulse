@@ -306,6 +306,15 @@ button { cursor: pointer; }
 .onb-tile.active .tile-icon { color: var(--paper); border-color: rgba(255,255,255,0.3); }
 .onb-tile .tile-label { font-size: 15px; }
 .onb-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 48px; padding-top: 28px; border-top: 1px solid var(--line); }
+.voice-tabs { display: flex; gap: 4px; margin-bottom: 20px; background: var(--paper-2); border-radius: 10px; padding: 4px; }
+.voice-tab { flex: 1; padding: 8px 16px; border-radius: 7px; font-size: 13.5px; font-weight: 500; color: var(--mute); background: transparent; border: none; cursor: pointer; transition: all var(--tx-fast); }
+.voice-tab.active { background: var(--paper); color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.voice-tab:hover:not(.active) { color: var(--ink); }
+.voice-recorder { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 200px; border: 1px solid var(--line); border-radius: 14px; padding: 40px 28px; background: var(--paper-2); }
+.mic-btn { width: 80px; height: 80px; border-radius: 50%; background: var(--paper); border: 2px solid var(--line); color: var(--ink); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--tx-fast); flex-shrink: 0; }
+.mic-btn:hover:not([style*="cursor: default"]) { border-color: var(--ink); transform: scale(1.06); }
+.mic-btn.recording { background: #ef4444; border-color: #ef4444; color: white; animation: mic-pulse 1.4s ease infinite; }
+@keyframes mic-pulse { 0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); } 65% { box-shadow: 0 0 0 18px rgba(239,68,68,0); } 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); } }
 
 /* ===================== APP SHELL ===================== */
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 240px 1fr; }

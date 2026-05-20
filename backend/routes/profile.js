@@ -10,18 +10,23 @@ router.get('/', requireAuth, async (req, res) => {
   try {
     const db = await getDb()
 
-    const [profile, stats, topTopics, topHooks, scriptHistory] = await Promise.all([
+    const [profile, stats, favFormatRes, topTopics, topHooks, scriptHistory] = await Promise.all([
       getCreatorProfile(req.userId),
 
       db.query(
         `SELECT
            COUNT(*) AS total_scripts,
            COUNT(*) FILTER (WHERE was_used = TRUE) AS used_scripts,
-           AVG(engagement_score) FILTER (WHERE engagement_score IS NOT NULL) AS avg_score,
-           MODE() WITHIN GROUP (ORDER BY format) AS fav_format
+           AVG(engagement_score) FILTER (WHERE engagement_score IS NOT NULL) AS avg_score
          FROM scripts WHERE user_id = $1`,
         [req.userId]
       ).catch(() => ({ rows: [{}] })),
+
+      db.query(
+        `SELECT format, COUNT(*) AS cnt FROM scripts WHERE user_id = $1
+         GROUP BY format ORDER BY cnt DESC LIMIT 1`,
+        [req.userId]
+      ).catch(() => ({ rows: [] })),
 
       db.query(
         `SELECT topic, count FROM topic_memory
@@ -73,7 +78,7 @@ router.get('/', requireAuth, async (req, res) => {
           totalScripts: parseInt(s.total_scripts || 0),
           usedScripts: parseInt(s.used_scripts || 0),
           avgScore: s.avg_score ? Math.round(parseFloat(s.avg_score)) : null,
-          favFormat: s.fav_format || null
+          favFormat: favFormatRes.rows[0]?.format || null
         },
         topTopics: topTopics.rows,
         topHooks: (topHooks.rows || []).map(r => ({

@@ -104,6 +104,8 @@ async function runMigrations(db) {
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS niches TEXT[]`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_id TEXT`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`,
+    // Ensure clerk_id unique index exists (ALTER TABLE ADD COLUMN does not add constraints)
+    `CREATE UNIQUE INDEX IF NOT EXISTS users_clerk_id_unique ON users (clerk_id) WHERE clerk_id IS NOT NULL`,
 
     // Add new columns to existing table (safe if already exists)
     `ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS content_format TEXT DEFAULT 'on-camera'`,

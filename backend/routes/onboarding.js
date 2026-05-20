@@ -71,10 +71,12 @@ router.post('/complete', requireAuth, async (req, res) => {
     const derivedNiches = selectedStyles.map(s => styleNicheMap[s.toLowerCase()] || s.toLowerCase()).filter(Boolean)
     const niches = derivedNiches.length > 0 ? [...new Set(derivedNiches)] : ['fitness', 'tech', 'finance']
 
-    // Save name + niches to users table
+    // Upsert user — ensures row exists even if auth middleware DB write failed
     await db.query(
-      'UPDATE users SET name = $1, niches = $2 WHERE id = $3',
-      [answers.creatorName, niches, req.userId]
+      `INSERT INTO users (id, email, name, niches)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, niches = EXCLUDED.niches, updated_at = NOW()`,
+      [req.userId, `${req.userId}@clerk.user`, answers.creatorName, niches]
     )
 
     // Process onboarding — extract voice traits, save profile

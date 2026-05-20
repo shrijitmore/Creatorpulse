@@ -28,26 +28,27 @@ export async function requireAuth(req, res, next) {
 
     const clerkUserId = auth.userId
 
-    // Upsert user in DB
+    // Upsert user in DB — use ON CONFLICT (id) since clerk_id unique index
+    // may not exist on old PGlite instances that pre-date that migration.
     try {
       const db = await getDb()
       const existing = await db.query('SELECT id FROM users WHERE clerk_id = $1', [clerkUserId])
       if (existing.rows.length > 0) {
         req.userId = existing.rows[0].id
       } else {
-        const newId = `user-${clerkUserId.slice(-8)}`
-        const fallbackEmail = `${clerkUserId.slice(-8)}@clerk.user`
+        const newId = `user-${clerkUserId.replace(/[^a-z0-9]/gi, '').slice(-12)}`
+        const fallbackEmail = `${newId}@clerk.user`
         await db.query(
           `INSERT INTO users (id, email, clerk_id) VALUES ($1, $2, $3)
-           ON CONFLICT (clerk_id) DO UPDATE SET email = EXCLUDED.email RETURNING id`,
+           ON CONFLICT (id) DO UPDATE SET clerk_id = COALESCE(users.clerk_id, EXCLUDED.clerk_id),
+                                          updated_at = NOW()`,
           [newId, fallbackEmail, clerkUserId]
         )
-        const created = await db.query('SELECT id FROM users WHERE clerk_id = $1', [clerkUserId])
-        req.userId = created.rows[0]?.id || newId
+        req.userId = newId
       }
     } catch (dbErr) {
       console.error('[auth] DB upsert error:', dbErr.message)
-      req.userId = clerkUserId  // fallback to Clerk ID
+      req.userId = `user-${clerkUserId.replace(/[^a-z0-9]/gi, '').slice(-12)}`
     }
 
     req.clerkId = clerkUserId
