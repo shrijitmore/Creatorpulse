@@ -36,7 +36,7 @@ router.post('/edit', async (req, res) => {
       ? `Creator voice: ${(profile.voice_traits || []).join(', ')} | Format: ${profile.content_format || 'on-camera'} | Language: ${profile.language_style || 'English'}`
       : ''
 
-    const model = createGeminiModel({ temperature: 0.4, maxOutputTokens: 1500 })
+    const model = createGeminiModel({ temperature: 0.4, maxOutputTokens: 4000 })
 
     // Build context about the full script so AI understands cascading changes
     const scriptContext = fullScript ? `
@@ -116,7 +116,7 @@ router.post('/followup', async (req, res) => {
     }
 
     const profile = await getCreatorProfile(req.userId)
-    const model = createGeminiModel({ temperature: 0.5, maxOutputTokens: 800 })
+    const model = createGeminiModel({ temperature: 0.5, maxOutputTokens: 2000 })
 
     const prompt = `You are refining a ${element} for a ${niche} content creator.
 

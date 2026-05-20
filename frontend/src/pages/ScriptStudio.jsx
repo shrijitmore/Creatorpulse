@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { Icon, Button, Chip, Tooltip, Segmented, Confirm, useToast, Logomark, ProLock } from '../components/ui.jsx'
 import { useScriptGeneration } from '../hooks/useScriptGeneration.js'
 import { getMemorySummary } from '../lib/api.js'
 import SceneEditModal from '../features/studio/SceneEditModal.jsx'
@@ -8,79 +7,49 @@ import RecordingStudio from '../features/studio/RecordingStudio.jsx'
 import ScriptDiff from '../features/studio/ScriptDiff.jsx'
 
 const AGENT_STEPS = [
-  { key:'fetch',   label:'Scanning source posts',       sub:'Reading posts across 3 communities' },
-  { key:'cluster', label:'Clustering the conversation', sub:'Grouping themes, picking the strongest angle' },
-  { key:'angle',   label:'Choosing an editorial angle', sub:'Matching to your voice and audience' },
-  { key:'script',  label:'Writing the script',          sub:'Hook, scenes, CTA' },
-  { key:'kit',     label:'Drafting the publish kit',    sub:'Hook variants, caption, hashtags, cover text' },
+  { key: 'fetch',   label: 'Scanning source posts',       sub: 'Reading posts across 3 communities' },
+  { key: 'cluster', label: 'Clustering conversation',     sub: 'Grouping themes, picking the angle' },
+  { key: 'angle',   label: 'Choosing editorial angle',    sub: 'Matching to your voice and audience' },
+  { key: 'script',  label: 'Writing the script',          sub: 'Hook, scenes, CTA' },
+  { key: 'kit',     label: 'Drafting publish kit',        sub: 'Hook variants, caption, hashtags' },
 ]
 
-// ─── Copy chip ───────────────────────────────────────────────────────────────
-
-function CopyChip({ text, label = 'Copy' }) {
+function CopyBtn({ text, label = 'Copy' }) {
   const [c, setC] = useState(false)
   const copy = () => {
     try { navigator.clipboard.writeText(text) } catch {}
     setC(true); setTimeout(() => setC(false), 900)
   }
   return (
-    <button onClick={copy} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border transition-all"
-      style={{ background: c ? 'var(--paper2)':'#fff', borderColor: c ? 'var(--ink2)':'var(--line)', color: c ? 'var(--ink)':'var(--ink2)', fontSize:11.5, fontWeight:500 }}>
-      {c ? <Icon.Check size={11} stroke={2.5}/> : <Icon.Copy size={11}/>}
-      {c ? 'Copied' : label}
+    <button
+      onClick={copy}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, border: `1px solid ${c ? 'var(--ink)' : 'var(--line)'}`, background: c ? 'var(--paper-2)' : '#fff', fontSize: 11.5, fontWeight: 500, color: c ? 'var(--ink)' : 'var(--mute)', fontFamily: 'var(--mono)', cursor: 'pointer', transition: 'all .18s' }}>
+      {c ? '✓ Copied' : label}
     </button>
   )
 }
 
-// ─── Agent overlay ────────────────────────────────────────────────────────────
+// ─── Agent strip (generation progress) ───────────────────────────────────────
 
-function AgentOverlay({ open, steps, onCancel }) {
-  if (!open) return null
+function AgentStrip({ steps }) {
   const doneCount = steps.filter(s => s.status === 'done').length
-  const pct = Math.round((doneCount / steps.length) * 100)
   const activeStep = steps.find(s => s.status === 'active')
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center px-4 fade-in"
-      style={{ background:'rgba(26,23,20,0.35)', backdropFilter:'blur(2px)' }}>
-      <div className="card w-full max-w-[460px] overflow-hidden"
-        style={{ animation:'fadeUp .25s cubic-bezier(.16,1,.3,1) forwards' }}>
-        <div className="px-6 pt-5 pb-4 border-b border-line">
-          <div className="flex items-center gap-2.5 mb-2">
-            <Logomark size={28}/>
-            <Chip tone="terra" icon={<span className="w-1.5 h-1.5 rounded-full bg-terra pulse-soft inline-block"/>}>Generating</Chip>
-          </div>
-          <h3 className="text-[18px] font-semibold tracking-tight text-ink leading-snug mb-0.5">Forging your script</h3>
-          <p className="text-[12.5px] text-ink2">{activeStep ? activeStep.label + '…' : pct === 100 ? 'All set.' : 'Initialising…'}</p>
-          <div className="mt-3 flex items-center gap-2">
-            <div className="flex-1 h-1 rounded-full bg-paper2 overflow-hidden">
-              <div className="h-full rounded-full bg-terra transition-all" style={{ width:`${pct}%` }}/>
+    <div className="agent-strip">
+      {steps.slice(0, 4).map((s, i) => {
+        const done = s.status === 'done'; const now = s.status === 'active'
+        return (
+          <div key={s.step} className={`agent ${done ? 'done' : now ? 'now' : ''}`}>
+            <span className="ag-ix">{String(i + 1).padStart(2, '0')}</span>
+            <div>
+              <b>{AGENT_STEPS[i]?.label || s.label}</b>
+              <span className="meta">{AGENT_STEPS[i]?.sub}</span>
             </div>
-            <span className="text-[10.5px] text-ink3 font-mono tabular-nums w-9 text-right">{pct}%</span>
+            {now && <span style={{ marginLeft: 'auto', display: 'flex', gap: 3 }}><span className="tdot"/><span className="tdot"/><span className="tdot"/></span>}
           </div>
-        </div>
-        <div className="px-6 py-4 space-y-3">
-          {steps.map((s, i) => {
-            const done = s.status === 'done'; const active = s.status === 'active'
-            return (
-              <div key={s.step} className="flex items-start gap-3" style={{ opacity: done || active ? 1 : 0.5, transition:'opacity .25s' }}>
-                <span className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5 font-mono text-[10px] font-semibold"
-                  style={{ background: done ? 'var(--ink)' : active ? 'var(--terrasoft)' : 'var(--paper2)', border:'1px solid', borderColor: done ? 'var(--ink)' : active ? 'var(--terra)' : 'var(--line)', color: done ? '#fff' : active ? 'var(--terradeep)' : 'var(--ink3)' }}>
-                  {done ? <Icon.Check size={11} stroke={2.5}/> : active ? <Icon.Refresh size={10} className="spin"/> : String(i + 1).padStart(2,'0')}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-[13px] font-medium ${done || active ? 'text-ink' : 'text-ink2'}`}>{AGENT_STEPS[i]?.label || s.label}</p>
-                  <p className="text-[11.5px] text-ink3">{AGENT_STEPS[i]?.sub || ''}</p>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-        <div className="px-6 py-3 border-t border-line bg-paper flex items-center justify-between">
-          <span className="text-[11px] text-ink3 font-mono">Powered by Creatorpulse engine</span>
-          <Button variant="ghost" size="sm" icon={<Icon.X size={12}/>} onClick={onCancel}>Cancel</Button>
-        </div>
-      </div>
+        )
+      })}
     </div>
   )
 }
@@ -98,220 +67,142 @@ function ScriptPanel({ script, onEditElement }) {
   }, [script])
 
   return (
-    <div className="overflow-y-auto px-6 lg:px-8 py-7" style={{ maxHeight:'calc(100vh - 56px - 70px)' }}>
-      <div className="max-w-[640px] mx-auto">
-        <div className="flex items-center gap-2 mb-2">
-          <Chip tone="terra">{script.tone}</Chip>
-          <Chip tone="line">{script.format} reel</Chip>
-          <Chip tone="line" icon={<Icon.IG size={11}/>}>Instagram</Chip>
-          <span className="flex-1"/>
-          <CopyChip text={fullText} label="Copy script"/>
+    <div className="studio-script">
+      <div className="ss-head">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+          <span style={{ padding: '4px 12px', borderRadius: 999, background: 'var(--paper-2)', border: '1px solid var(--line)', fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--ink-2)' }}>{script.tone}</span>
+          <span style={{ padding: '4px 12px', borderRadius: 999, background: 'var(--paper-2)', border: '1px solid var(--line)', fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--ink-2)' }}>{script.format} reel</span>
+          <div style={{ marginLeft: 'auto' }}><CopyBtn text={fullText} label="Copy script"/></div>
         </div>
-        <h2 className="text-[24px] font-semibold tracking-[-0.015em] text-ink leading-tight mb-4">{script.topicTitle}</h2>
+        <h2 style={{ fontSize: 22, fontWeight: 500, letterSpacing: '-0.015em', color: 'var(--ink)' }}>{script.topicTitle}</h2>
+      </div>
 
-        <div className="border-t border-line my-5"/>
-
-        {/* Hook */}
-        <div className="flex items-end justify-between gap-3 mb-3">
-          <div><p className="kicker mb-1">0–3 seconds</p><h3 className="text-[16px] font-semibold text-ink">The hook</h3></div>
-          <div className="flex items-center gap-1.5">
-            <Tooltip label="Edit with AI" placement="top">
-              <button onClick={() => onEditElement?.({ scene: null, element: 'hook' })}
-                className="w-7 h-7 rounded-md flex items-center justify-center border border-line bg-white hover:bg-paper2 text-ink3 hover:text-ink transition-colors">
-                <Icon.Edit size={12}/>
-              </button>
-            </Tooltip>
-            <CopyChip text={script.hookLine}/>
+      {/* Hook */}
+      <div className="scene active">
+        <div className="sc-head">
+          <span className="sc-ix">Hook · 0–3 sec</span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="sc-edit-btn" onClick={() => onEditElement?.({ scene: null, element: 'hook' })}>Edit with AI</button>
+            <CopyBtn text={script.hookLine}/>
           </div>
         </div>
-        <div className="card-soft p-5 border-l-[3px]" style={{ borderLeftColor:'var(--terra)' }}>
-          <p className="text-[18px] font-medium tracking-tight text-ink leading-snug">"{script.hookLine}"</p>
-        </div>
+        <p className="sc-line">"{script.hookLine}"</p>
+      </div>
 
-        {/* Scenes */}
-        <div className="flex items-end justify-between gap-3 mt-8 mb-3">
-          <div><p className="kicker mb-1">Beats</p><h3 className="text-[16px] font-semibold text-ink">The scenes</h3></div>
-        </div>
-        <div className="space-y-4">
-          {(script.scenes || []).map(s => (
-            <div key={s.sceneNumber} className="flex gap-3 group">
-              <div className="flex-shrink-0 flex flex-col items-center pt-0.5">
-                <div className="w-9 h-9 rounded-md bg-ink text-white flex items-center justify-center font-mono text-[12px] font-semibold">
-                  {String(s.sceneNumber).padStart(2,'0')}
-                </div>
-                <span className="mt-1.5 text-[10px] font-mono text-ink3">{s.duration}</span>
-              </div>
-              <div className="flex-1 card p-4 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1">
-                    <p className="kicker mb-1">Visuals</p>
-                    <p className="text-[13.5px] text-ink2 leading-relaxed">{s.visuals}</p>
-                  </div>
-                  <Tooltip label="Edit visual with AI" placement="left">
-                    <button onClick={() => onEditElement?.({ scene: s, element: 'visual' })}
-                      className="w-7 h-7 rounded-md flex items-center justify-center border border-line bg-white hover:bg-paper2 text-ink3 hover:text-ink transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100">
-                      <Icon.Edit size={11}/>
-                    </button>
-                  </Tooltip>
-                </div>
-                <div className="border-t border-line2"/>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1">
-                    <p className="kicker mb-1">Voiceover <span style={{ color:'var(--terra)', textTransform:'none', letterSpacing:'normal' }}>· spoken</span></p>
-                    <p className="text-[14px] text-ink leading-relaxed italic">"{s.voiceover}"</p>
-                  </div>
-                  <Tooltip label="Edit voiceover with AI" placement="left">
-                    <button onClick={() => onEditElement?.({ scene: s, element: 'voiceover' })}
-                      className="w-7 h-7 rounded-md flex items-center justify-center border border-line bg-white hover:bg-paper2 text-ink3 hover:text-ink transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100">
-                      <Icon.Edit size={11}/>
-                    </button>
-                  </Tooltip>
-                </div>
-                <div className="flex items-center justify-end gap-1.5 pt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <CopyChip text={`VISUALS: ${s.visuals}\nVOICEOVER: ${s.voiceover}`}/>
-                </div>
-              </div>
+      {/* Scenes */}
+      {(script.scenes || []).map(s => (
+        <div key={s.sceneNumber} className="scene">
+          <div className="sc-head">
+            <span className="sc-ix">Scene {String(s.sceneNumber).padStart(2, '0')} · {s.duration}</span>
+            <div style={{ display: 'flex', gap: 8, opacity: 0 }} className="sc-actions">
+              <button className="sc-edit-btn" onClick={() => onEditElement?.({ scene: s, element: 'visual' })}>Edit visual</button>
+              <button className="sc-edit-btn" onClick={() => onEditElement?.({ scene: s, element: 'voiceover' })}>Edit VO</button>
             </div>
-          ))}
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <span className="label" style={{ marginBottom: 4 }}>Visuals</span>
+            <p className="body" style={{ fontSize: 14 }}>{s.visuals}</p>
+          </div>
+          <div>
+            <span className="label" style={{ marginBottom: 4 }}>Voiceover <em style={{ fontStyle: 'normal', color: 'var(--mute)' }}>· spoken</em></span>
+            <p className="sc-line" style={{ fontStyle: 'italic' }}>"{s.voiceover}"</p>
+          </div>
         </div>
+      ))}
 
-        {/* CTA */}
-        <div className="flex items-end justify-between gap-3 mt-8 mb-3">
-          <div><p className="kicker mb-1">The close</p><h3 className="text-[16px] font-semibold text-ink">Call to action</h3></div>
-          <CopyChip text={script.cta}/>
+      {/* CTA */}
+      <div className="scene">
+        <div className="sc-head">
+          <span className="sc-ix">CTA · The close</span>
+          <CopyBtn text={script.cta}/>
         </div>
-        <div className="card-soft p-5 border-l-[3px]" style={{ borderLeftColor:'var(--ink2)' }}>
-          <p className="text-[15px] text-ink leading-relaxed italic">"{script.cta}"</p>
-        </div>
+        <p className="sc-line" style={{ fontStyle: 'italic' }}>"{script.cta}"</p>
+      </div>
 
-        <div className="border-t border-line border-dashed mt-8 mb-4"/>
-        <p className="text-[11px] font-mono text-ink3 text-center">
-          End of draft · {(script.scenes || []).length} scenes · ~{script.format}
-        </p>
+      <div style={{ borderTop: '1px dashed var(--line)', marginTop: 20, paddingTop: 14, textAlign: 'center' }}>
+        <span className="small mono">{(script.scenes || []).length} scenes · ~{script.format}</span>
       </div>
     </div>
   )
 }
 
-// ─── Content kit ─────────────────────────────────────────────────────────────
+// ─── Content kit sidebar ──────────────────────────────────────────────────────
 
 function ContentKit({ contentKit, regenerating, onRegenerate }) {
   if (!contentKit) return null
   const allTags = [...(contentKit.hashtags?.niche || []), ...(contentKit.hashtags?.trending || []), ...(contentKit.hashtags?.broad || [])].join(' ')
+  const tones = ['rgba(181,200,255,0.9)', 'rgba(10,10,10,0.08)', 'rgba(34,197,94,0.3)']
 
   return (
-    <div className="overflow-y-auto border-l border-line bg-paper" style={{ maxHeight:'calc(100vh - 56px - 70px)' }}>
-      <div className="px-5 py-6 max-w-[420px]">
-        <p className="kicker mb-1">Publish kit</p>
-        <h3 className="text-[18px] font-semibold tracking-tight text-ink">Everything to ship this</h3>
-        <p className="text-[12.5px] text-ink3 mt-1">Hook variants, caption, hashtags, and cover text — ready to paste.</p>
+    <div className="studio-side">
+      <div className="card">
+        <span className="label" style={{ marginBottom: 6 }}>Publish kit</span>
+        <h3 style={{ fontSize: 16, fontWeight: 500, color: 'var(--ink)', marginBottom: 4 }}>Everything to ship this</h3>
+        <p className="small">Hook variants, caption, hashtags, cover text.</p>
+      </div>
 
-        <div className="border-t border-line mt-5 mb-5"/>
-
-        {/* Hook variants */}
-        <KitSection title="Three hook variants" subtitle="One angle each" onRegen={() => onRegenerate?.('hooks')} regenLoading={regenerating?.hooks}>
-          <div className="space-y-2">
-            {(contentKit.hookVariants || []).map((h, i) => {
-              const tones = ['var(--terra)','var(--ink2)','var(--successc)']
-              const hookText = typeof h === 'string' ? h : h?.text || ''
-              const hookType = typeof h === 'string' ? ['Storytelling','Bold claim','Question'][i] : h?.type || ''
-              return (
-                <div key={i} className="card p-3.5 border-l-[3px]" style={{ borderLeftColor: tones[i] }}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10.5px] font-medium uppercase tracking-[0.06em]" style={{ color: tones[i] }}>{hookType}</span>
-                    <CopyChip text={hookText}/>
-                  </div>
-                  <p className="text-[13.5px] text-ink leading-snug italic">"{hookText}"</p>
+      {/* Hook variants */}
+      <div className="card">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <span className="label" style={{ marginBottom: 0 }}>Hook variants</span>
+          <button className="sc-edit-btn" onClick={() => onRegenerate?.('hooks')} style={{ fontSize: 10 }}>↻ Regen</button>
+        </div>
+        <div className="hook-list">
+          {(contentKit.hookVariants || []).map((h, i) => {
+            const hookText = typeof h === 'string' ? h : h?.text || ''
+            const hookType = typeof h === 'string' ? ['Storytelling', 'Bold claim', 'Question'][i] : h?.type || ''
+            return (
+              <div key={i} style={{ padding: '12px', border: `1px solid var(--line)`, borderLeft: `3px solid ${tones[i] || 'var(--line)'}`, borderRadius: 10, background: '#fff' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span className="small" style={{ fontWeight: 500, color: 'var(--mute)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{hookType}</span>
+                  <CopyBtn text={hookText}/>
                 </div>
-              )
-            })}
+                <p style={{ fontSize: 13.5, color: 'var(--ink)', fontStyle: 'italic' }}>"{hookText}"</p>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Caption */}
+      {contentKit.caption && (
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span className="label" style={{ marginBottom: 0 }}>Instagram caption</span>
+            <CopyBtn text={contentKit.caption}/>
           </div>
-        </KitSection>
+          <p style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.6, maxHeight: 160, overflowY: 'auto', whiteSpace: 'pre-line' }}>{contentKit.caption}</p>
+        </div>
+      )}
 
-        {/* Caption */}
-        <KitSection title="Instagram caption" right={<CopyChip text={contentKit.caption || ''}/>} onRegen={() => onRegenerate?.('caption')} regenLoading={regenerating?.caption}>
-          <div className="card p-3.5 max-h-[180px] overflow-y-auto">
-            <p className="text-[13px] text-ink2 leading-relaxed whitespace-pre-line">{contentKit.caption}</p>
+      {/* Hashtags */}
+      {contentKit.hashtags && (
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span className="label" style={{ marginBottom: 0 }}>Hashtags</span>
+            <CopyBtn text={allTags} label="Copy all"/>
           </div>
-        </KitSection>
-
-        {/* Hashtags */}
-        <KitSection title="Hashtags" right={<CopyChip text={allTags} label="Copy all"/>} onRegen={() => onRegenerate?.('hashtags')} regenLoading={regenerating?.hashtags}>
-          <TagRow label="Niche"    tags={contentKit.hashtags?.niche || []}    color="var(--terra)"/>
-          <TagRow label="Trending" tags={contentKit.hashtags?.trending || []} color="var(--successc)"/>
-          <TagRow label="Broad"    tags={contentKit.hashtags?.broad || []}    color="var(--ink2)"/>
-        </KitSection>
-
-        {/* Cover text */}
-        <KitSection title="Cover text" subtitle="9:16 preview" right={<CopyChip text={contentKit.thumbnailText || ''}/>} onRegen={() => onRegenerate?.('thumbnail')} regenLoading={regenerating?.thumbnail}>
-          <CoverPreview text={contentKit.thumbnailText || ''}/>
-        </KitSection>
-      </div>
-    </div>
-  )
-}
-
-function KitSection({ title, subtitle, right, onRegen, regenLoading, children }) {
-  return (
-    <section className="mb-6">
-      <div className="flex items-center justify-between mb-2.5">
-        <div>
-          <p className="text-[13px] font-semibold text-ink">{title}</p>
-          {subtitle && <p className="text-[10.5px] text-ink3 uppercase tracking-[0.06em] font-medium">{subtitle}</p>}
+          {[
+            { label: 'Niche', tags: contentKit.hashtags?.niche || [], c: 'rgba(181,200,255,0.9)' },
+            { label: 'Trending', tags: contentKit.hashtags?.trending || [], c: 'rgba(34,197,94,0.35)' },
+            { label: 'Broad', tags: contentKit.hashtags?.broad || [], c: 'rgba(10,10,10,0.08)' },
+          ].map(row => row.tags.length > 0 && (
+            <div key={row.label} style={{ marginBottom: 10 }}>
+              <span className="label" style={{ color: 'var(--mute)', marginBottom: 6 }}>{row.label}</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {row.tags.map(t => (
+                  <button
+                    key={t}
+                    onClick={() => { try { navigator.clipboard.writeText(t) } catch {} }}
+                    style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid var(--line)', background: row.c, fontSize: 11.5, fontFamily: 'var(--mono)', color: 'var(--ink-2)', cursor: 'pointer' }}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
-        <div className="flex items-center gap-1.5">
-          {right}
-          {onRegen && (
-            <Tooltip label="Regenerate" placement="left">
-              <button onClick={onRegen} disabled={regenLoading}
-                className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-line bg-white hover:bg-paper2 text-ink3 hover:text-ink transition-colors">
-                <Icon.Refresh size={11} className={regenLoading ? 'spin' : ''}/>
-              </button>
-            </Tooltip>
-          )}
-        </div>
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function TagRow({ label, tags, color }) {
-  return (
-    <div className="mb-3 last:mb-0">
-      <p className="text-[10.5px] font-medium uppercase tracking-[0.06em] mb-1.5" style={{ color }}>{label}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {tags.map(t => <TagPill key={t} tag={t} color={color}/>)}
-      </div>
-    </div>
-  )
-}
-
-function TagPill({ tag, color }) {
-  const [c, setC] = useState(false)
-  return (
-    <button onClick={() => { try { navigator.clipboard.writeText(tag) } catch {} setC(true); setTimeout(() => setC(false), 800) }}
-      className="px-2 py-0.5 rounded-md border bg-white text-[11.5px] font-mono transition-all"
-      style={{ borderColor: c ? color : 'var(--line)', color: c ? color : 'var(--ink2)' }}>
-      {tag}
-    </button>
-  )
-}
-
-function CoverPreview({ text }) {
-  return (
-    <div className="flex items-center justify-center py-3">
-      <div className="relative rounded-xl overflow-hidden border border-line bg-ink" style={{ width:160, aspectRatio:'9 / 16' }}>
-        <div className="absolute inset-0 opacity-[0.08]" style={{ backgroundImage:'radial-gradient(rgba(255,255,255,0.6) 1px, transparent 1px)', backgroundSize:'4px 4px' }}/>
-        <div className="absolute top-2.5 left-2.5 flex items-center gap-1">
-          <span className="w-1 h-1 rounded-full bg-terra"/>
-          <span className="text-[8px] font-mono uppercase tracking-[0.18em] text-white/70">creatorpulse</span>
-        </div>
-        <div className="absolute inset-0 flex items-center justify-center px-4">
-          <p className="text-center text-white font-semibold leading-tight" style={{ fontSize:15 }}>{text}</p>
-        </div>
-        <div className="absolute bottom-2.5 left-2.5 right-2.5 h-px opacity-70" style={{ background:'var(--terra)' }}/>
-      </div>
+      )}
     </div>
   )
 }
@@ -334,7 +225,7 @@ function MemorySidebar({ niche }) {
   const topTopics = memory?.topTopics || []
   const total = memory?.totalScripts ?? 0
 
-  function timeAgo(d) {
+  const timeAgo = (d) => {
     const diff = Date.now() - new Date(d).getTime()
     const days = Math.floor(diff / 86400000)
     if (days === 0) return 'today'
@@ -343,97 +234,67 @@ function MemorySidebar({ niche }) {
   }
 
   return (
-    <aside className="overflow-y-auto border-l border-line bg-paper" style={{ maxHeight:'calc(100vh - 56px - 70px)' }}>
-      <div className="px-5 py-6">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-terrasoft border border-[#EBD3B6] text-terradeep">
-                <Icon.Brain size={13}/>
-              </span>
-              <p className="text-[13px] font-semibold text-ink">AI Memory</p>
-            </div>
-            <p className="text-[11.5px] text-ink3 leading-snug">What I'm using to write this — pulled from your archive.</p>
-          </div>
-          <Chip tone="success" icon={<span className="w-1.5 h-1.5 rounded-full bg-successc live-dot inline-block"/>}>Live</Chip>
+    <div className="studio-side">
+      <div className="card">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+          <span style={{ width: 24, height: 24, borderRadius: 6, background: 'var(--paper-3)', border: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>⊙</span>
+          <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>AI Memory</p>
+          <span className="chip" style={{ marginLeft: 'auto', fontSize: 10 }}><span className="dot"/> Live</span>
         </div>
-        <div className="border-t border-line mb-4"/>
-
-        <MemorySection icon={<Icon.Layers size={11}/>} title="Similar past scripts" hint={recentScripts.length ? `${recentScripts.length} found` : ''}>
-          {loading ? (
-            <div className="space-y-2">{Array.from({length:2}).map((_,i)=><div key={i} className="skel h-14 rounded-lg"/>)}</div>
-          ) : recentScripts.length === 0 ? (
-            <p className="text-[12px] text-ink3 italic">No scripts yet — generate some to build memory.</p>
-          ) : (
-            <div className="space-y-2">
-              {recentScripts.slice(0,3).map((s, i) => (
-                <div key={i} className="card p-3 hover:bg-paper2 transition-colors cursor-pointer group"
-                  onClick={() => navigate('/saved')}>
-                  <p className="text-[12.5px] font-medium text-ink leading-snug mb-1.5 truncate">{s.topicTitle || s.topic_title}</p>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <Chip tone="soft">{s.tone}</Chip>
-                      <span className="text-[10.5px] text-ink3 font-mono">{timeAgo(s.createdAt || s.created_at)}</span>
-                    </div>
-                    <Chip tone="terra">{s.format}</Chip>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </MemorySection>
-
-        <MemorySection icon={<Icon.Hash size={11}/>} title="Topics you've covered" hint={topTopics.length ? `${topTopics.length} topics` : ''}>
-          {loading ? (
-            <div className="flex flex-wrap gap-1.5">{Array.from({length:5}).map((_,i)=><div key={i} className="skel h-6 w-16 rounded"/>)}</div>
-          ) : topTopics.length === 0 ? (
-            <p className="text-[12px] text-ink3 italic">Generate scripts to track covered topics.</p>
-          ) : (
-            <div className="flex flex-wrap gap-1.5">
-              {topTopics.map(t => (
-                <span key={t.topic} className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-line bg-white text-[11.5px] text-ink2 hover:border-ink3 hover:text-ink transition-colors cursor-pointer">
-                  {t.topic}
-                  <span className="text-[9px] text-ink4 font-mono">{t.count}</span>
-                </span>
-              ))}
-            </div>
-          )}
-        </MemorySection>
-
-        <div className="pt-4 mt-2 border-t border-line flex items-center justify-between">
-          <span className="text-[10.5px] text-ink3 font-mono">{topTopics.length} topics · {total} scripts indexed</span>
-          <button onClick={() => navigate('/profile')} className="text-[11.5px] font-medium text-ink2 hover:text-ink flex items-center gap-1">
-            Full profile <Icon.Arrow size={11}/>
-          </button>
-        </div>
+        <p className="small">What I'm using to write this — pulled from your archive.</p>
       </div>
-    </aside>
-  )
-}
 
-function MemorySection({ icon, title, hint, children }) {
-  const [open, setOpen] = useState(true)
-  return (
-    <div className="mb-5">
-      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between mb-2.5 group">
-        <div className="flex items-center gap-2">
-          <span className="text-ink3">{icon}</span>
-          <span className="text-[11.5px] font-semibold uppercase tracking-[0.06em] text-ink2 group-hover:text-ink">{title}</span>
-          {hint && <span className="text-[10.5px] text-ink3 font-mono">{hint}</span>}
+      {loading ? (
+        <div className="card">
+          <div style={{ height: 80, background: 'var(--paper-3)', borderRadius: 8 }}/>
         </div>
-        <Icon.ChevD size={12} className="text-ink3" style={{ transform: open ? 'rotate(0)' : 'rotate(-90deg)', transition:'transform .15s' }}/>
-      </button>
-      {open && <div className="fade-in">{children}</div>}
+      ) : recentScripts.length === 0 ? (
+        <div className="card">
+          <p className="small" style={{ fontStyle: 'italic' }}>No past scripts yet — generate some to build memory.</p>
+        </div>
+      ) : (
+        <div className="card">
+          <span className="label" style={{ marginBottom: 12 }}>Similar past scripts</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {recentScripts.slice(0, 3).map((s, i) => (
+              <div key={i}
+                onClick={() => navigate('/saved')}
+                style={{ padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 10, cursor: 'pointer', transition: 'background var(--tx-fast)' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--paper-2)'}
+                onMouseLeave={e => e.currentTarget.style.background = ''}>
+                <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.topicTitle || s.topic_title}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--mute)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s.tone}</span>
+                  <span className="small mono">{timeAgo(s.createdAt || s.created_at)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {topTopics.length > 0 && (
+        <div className="card">
+          <span className="label" style={{ marginBottom: 10 }}>Topics covered</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {topTopics.map(t => (
+              <span key={t.topic} style={{ padding: '3px 10px', border: '1px solid var(--line)', borderRadius: 6, fontSize: 12, color: 'var(--ink-2)' }}>
+                {t.topic} <span className="small mono">{t.count}</span>
+              </span>
+            ))}
+          </div>
+          <p className="small" style={{ marginTop: 12 }}>{topTopics.length} topics · {total} scripts indexed</p>
+        </div>
+      )}
     </div>
   )
 }
 
-// ─── Studio screen ────────────────────────────────────────────────────────────
+// ─── Script Studio ────────────────────────────────────────────────────────────
 
 export default function ScriptStudio() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const toast = useToast()
 
   const topicId    = searchParams.get('topicId') || ''
   const topicTitle = searchParams.get('title') ? decodeURIComponent(searchParams.get('title')) : ''
@@ -442,183 +303,146 @@ export default function ScriptStudio() {
   const [tone, setTone]     = useState('Storytelling')
   const [format, setFormat] = useState('60s')
   const [saved, setSaved]   = useState(false)
-  const [confirmRegen, setConfirmRegen] = useState(false)
   const [recordingOpen, setRecordingOpen] = useState(false)
   const [diffOpen, setDiffOpen] = useState(false)
-
-  // Scene editing modal state
-  const [editTarget, setEditTarget] = useState(null)  // { scene, element }
-  const [localScript, setLocalScript] = useState(null)  // tracks user edits
+  const [editTarget, setEditTarget] = useState(null)
+  const [localScript, setLocalScript] = useState(null)
 
   const { isGenerating, steps, script: generatedScript, contentKit, error, regenerating, generate, cancelGeneration, regenerateContentSection } = useScriptGeneration()
-
-  // Use localScript if user has made edits, otherwise use generated
   const script = localScript || generatedScript
-
-  const handleEditElement = ({ scene, element }) => {
-    setEditTarget({ scene, element })
-  }
 
   const handleApplyEdit = ({ element, suggestion, scene, cascading }) => {
     setLocalScript(prev => {
       const base = prev || generatedScript
       if (!base) return base
       const updated = { ...base }
-
       if (element === 'hook') updated.hookLine = suggestion
       else if (element === 'cta') updated.cta = suggestion
-      else if (element === 'visual' && scene) {
-        updated.scenes = (updated.scenes || []).map(s =>
-          s.sceneNumber === scene.sceneNumber ? { ...s, visuals: suggestion } : s
-        )
-      } else if (element === 'voiceover' && scene) {
-        updated.scenes = (updated.scenes || []).map(s =>
-          s.sceneNumber === scene.sceneNumber ? { ...s, voiceover: suggestion } : s
-        )
-      }
-
-      // Apply cascading change if present
+      else if (element === 'visual' && scene)
+        updated.scenes = (updated.scenes || []).map(s => s.sceneNumber === scene.sceneNumber ? { ...s, visuals: suggestion } : s)
+      else if (element === 'voiceover' && scene)
+        updated.scenes = (updated.scenes || []).map(s => s.sceneNumber === scene.sceneNumber ? { ...s, voiceover: suggestion } : s)
       if (cascading?.needed && cascading.suggestion) {
-        if (cascading.element === 'voiceover' && scene) {
-          updated.scenes = (updated.scenes || []).map(s =>
-            s.sceneNumber === scene.sceneNumber ? { ...s, voiceover: cascading.suggestion } : s
-          )
-        } else if (cascading.element === 'visual' && scene) {
-          updated.scenes = (updated.scenes || []).map(s =>
-            s.sceneNumber === scene.sceneNumber ? { ...s, visuals: cascading.suggestion } : s
-          )
-        } else if (cascading.element === 'voiceover' && element === 'hook') {
-          if (updated.scenes?.[0]) updated.scenes[0] = { ...updated.scenes[0], voiceover: cascading.suggestion }
-        }
+        if (cascading.element === 'voiceover' && scene)
+          updated.scenes = (updated.scenes || []).map(s => s.sceneNumber === scene.sceneNumber ? { ...s, voiceover: cascading.suggestion } : s)
+        else if (cascading.element === 'visual' && scene)
+          updated.scenes = (updated.scenes || []).map(s => s.sceneNumber === scene.sceneNumber ? { ...s, visuals: cascading.suggestion } : s)
+        else if (cascading.element === 'voiceover' && element === 'hook' && updated.scenes?.[0])
+          updated.scenes[0] = { ...updated.scenes[0], voiceover: cascading.suggestion }
       }
-
       return updated
     })
-    toast?.success('Scene updated')
   }
 
   useEffect(() => {
     if (topicId && !script && !isGenerating) generate(topicId, topicTitle, topicNiche, tone.toLowerCase(), format)
   }, [])
 
-  const handleRegen = () => { setConfirmRegen(false); generate(topicId, topicTitle, topicNiche, tone.toLowerCase(), format) }
-
   if (!topicId && !script) {
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-56px)] px-8">
-        <div className="text-center max-w-md">
-          <div className="w-14 h-14 mx-auto rounded-xl bg-paper2 border border-line flex items-center justify-center text-ink3 mb-4">
-            <Icon.Wand size={22}/>
-          </div>
-          <h2 className="text-[20px] font-semibold tracking-tight text-ink mb-1">No topic in the press yet</h2>
-          <p className="text-[13.5px] text-ink3 leading-relaxed mb-4">Pick a trend from the dashboard and we'll set the type and run a draft.</p>
-          <Button variant="primary" icon={<Icon.Arrow size={13}/>} onClick={() => navigate('/dashboard')}>Open dashboard</Button>
+      <div className="app-main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 56px)' }}>
+        <div style={{ textAlign: 'center', maxWidth: 360 }}>
+          <div style={{ width: 56, height: 56, borderRadius: 14, background: 'var(--paper-3)', border: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 22 }}>✦</div>
+          <h2 style={{ fontSize: 20, fontWeight: 500, letterSpacing: '-0.01em', color: 'var(--ink)', marginBottom: 8 }}>No topic in the press yet</h2>
+          <p className="body" style={{ marginBottom: 24 }}>Pick a trend from the dashboard and we'll set the type and run a draft.</p>
+          <button className="btn btn-primary" onClick={() => navigate('/dashboard')}>Open dashboard →</button>
         </div>
       </div>
     )
   }
 
+  const TONE_OPTS  = ['Storytelling', 'Educational', 'Entertaining', 'Controversial']
+  const FORMAT_OPTS = ['30s', '60s', '90s']
+
   return (
-    <div className="flex flex-col h-[calc(100vh-56px)]">
-      {/* Studio top bar */}
-      <div className="px-6 lg:px-8 py-4 border-b border-line bg-paper flex flex-wrap items-center gap-3">
-        <button onClick={() => navigate('/dashboard')}
-          className="text-ink3 hover:text-ink p-1.5 rounded-md hover:bg-paper2 transition-colors">
-          <Icon.ChevL size={16}/>
-        </button>
-        <div className="flex-1 min-w-0">
-          <p className="kicker mb-0.5">Composition</p>
-          <h2 className="text-[16px] font-semibold tracking-tight text-ink truncate leading-snug">{topicTitle || script?.topicTitle || 'Script Studio'}</h2>
+    <div className="studio">
+      {/* Top bar */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '0 0 24px', borderBottom: '1px solid var(--line)', marginBottom: 24 }}>
+        <button onClick={() => navigate('/dashboard')} style={{ padding: 8, borderRadius: 8, border: '1px solid var(--line)', background: 'var(--paper-2)', fontSize: 14, cursor: 'pointer' }}>←</button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span className="label" style={{ marginBottom: 2 }}>Composition</span>
+          <h2 style={{ fontSize: 16, fontWeight: 500, letterSpacing: '-0.01em', color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topicTitle || script?.topicTitle || 'Script Studio'}</h2>
         </div>
 
-        <Tooltip label="The voice of the draft" placement="bottom">
-          <span>
-            <Segmented value={tone} onChange={setTone} options={[
-              { value:'Storytelling', label:'Story' },
-              { value:'Educational',  label:'Teach' },
-              { value:'Entertaining', label:'Play' },
-              { value:'Controversial',label:'Sharp' },
-            ]}/>
-          </span>
-        </Tooltip>
+        {/* Tone */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          {TONE_OPTS.map(t => (
+            <button
+              key={t}
+              onClick={() => setTone(t)}
+              style={{ padding: '6px 12px', borderRadius: 999, border: `1px solid ${tone === t ? 'var(--ink)' : 'var(--line)'}`, background: tone === t ? 'var(--ink)' : 'var(--paper)', color: tone === t ? '#fff' : 'var(--ink-2)', fontSize: 12.5, fontWeight: 500, cursor: 'pointer', transition: 'all .18s' }}>
+              {t === 'Storytelling' ? 'Story' : t === 'Educational' ? 'Teach' : t === 'Entertaining' ? 'Play' : 'Sharp'}
+            </button>
+          ))}
+        </div>
 
-        <Tooltip label="Target length" placement="bottom">
-          <span>
-            <Segmented value={format} onChange={setFormat} options={[
-              { value:'30s', label:'30s' }, { value:'60s', label:'60s' }, { value:'90s', label:'90s' },
-            ]}/>
-          </span>
-        </Tooltip>
+        {/* Format */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          {FORMAT_OPTS.map(f => (
+            <button
+              key={f}
+              onClick={() => setFormat(f)}
+              style={{ padding: '6px 12px', borderRadius: 999, border: `1px solid ${format === f ? 'var(--ink)' : 'var(--line)'}`, background: format === f ? 'var(--ink)' : 'var(--paper)', color: format === f ? '#fff' : 'var(--ink-2)', fontSize: 12.5, fontWeight: 500, cursor: 'pointer', transition: 'all .18s' }}>
+              {f}
+            </button>
+          ))}
+        </div>
 
         {script && (
-          <ProLock locked={false} feature="Voice coaching">
-            <Button variant="soft" size="sm" icon={<Icon.Mic size={13}/>} onClick={() => setRecordingOpen(true)}>
-              Practice
-            </Button>
-          </ProLock>
+          <button className="btn btn-line btn-sm" onClick={() => setRecordingOpen(true)}>🎙 Practice</button>
         )}
         {localScript && generatedScript && (
-          <Button variant="ghost" size="sm" icon={<Icon.Eye size={13}/>} onClick={() => setDiffOpen(true)}>
-            Changes
-          </Button>
+          <button className="btn btn-line btn-sm" onClick={() => setDiffOpen(true)}>Changes</button>
         )}
-        <Button variant="soft" size="sm" icon={<Icon.Refresh size={13}/>} onClick={() => setConfirmRegen(true)}>Re-forge</Button>
-
+        <button className="btn btn-line btn-sm" onClick={() => generate(topicId, topicTitle, topicNiche, tone.toLowerCase(), format)}>↻ Re-forge</button>
         {script && (
-          <Button variant="primary" size="sm"
-            icon={saved ? <Icon.Check size={13} stroke={2.5}/> : <Icon.Save size={13}/>}
-            onClick={() => {
-              setSaved(true)
-              toast?.success('Script saved to library', { action:{ label:'Open', onClick:() => navigate('/saved') } })
-              setTimeout(() => setSaved(false), 2500)
-            }}>
-            {saved ? 'Saved' : 'Save to library'}
-          </Button>
+          <button
+            className={`btn btn-sm ${saved ? 'btn-line' : 'btn-primary'}`}
+            onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 2500) }}>
+            {saved ? '✓ Saved' : 'Save to library'}
+          </button>
         )}
       </div>
 
+      {/* Error */}
       {error && (
-        <div className="mx-6 mt-3 banner banner-error text-[12.5px]">
-          <Icon.Alert size={14}/> {error}
+        <div style={{ marginBottom: 20, padding: '12px 16px', background: 'rgba(192,74,46,0.08)', border: '1px solid rgba(192,74,46,0.2)', borderRadius: 10, fontSize: 13, color: 'rgb(192,74,46)' }}>
+          ⚠ {error}
         </div>
       )}
 
-      {/* 3-column split */}
+      {/* Agent strip during generation */}
+      {isGenerating && steps?.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <AgentStrip steps={steps}/>
+          <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
+            <button className="btn btn-ghost btn-sm" onClick={cancelGeneration}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Studio grid */}
       {script ? (
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_400px_300px] flex-1 overflow-hidden">
-          <ScriptPanel script={script} onEditElement={handleEditElement}/>
-          <ContentKit contentKit={contentKit} regenerating={regenerating} onRegenerate={regenerateContentSection}/>
-          <MemorySidebar niche={topicNiche}/>
+        <div className="studio-grid">
+          <div>
+            <ScriptPanel script={script} onEditElement={({ scene, element }) => setEditTarget({ scene, element })}/>
+          </div>
+          <div style={{ display: 'grid', gap: 24, gridTemplateColumns: '1fr', alignContent: 'start' }}>
+            <ContentKit contentKit={contentKit} regenerating={regenerating} onRegenerate={regenerateContentSection}/>
+            <MemorySidebar niche={topicNiche}/>
+          </div>
         </div>
       ) : !isGenerating ? (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center px-4">
-            <div className="w-14 h-14 mx-auto rounded-xl bg-paper2 border border-line flex items-center justify-center text-ink3 mb-4 opacity-40">
-              <Icon.Wand size={22}/>
-            </div>
-            <p className="text-[13px] text-ink3">Click Re-forge to generate a new script</p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 320 }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.3 }}>✦</div>
+            <p className="body">Click Re-forge to generate a new script</p>
           </div>
         </div>
       ) : null}
 
-      <AgentOverlay open={isGenerating} steps={steps} onCancel={cancelGeneration}/>
-
-      {/* Script diff view */}
-      <ScriptDiff
-        open={diffOpen}
-        onClose={() => setDiffOpen(false)}
-        original={generatedScript}
-        edited={localScript}
-      />
-
-      {/* Recording Studio */}
-      <RecordingStudio
-        open={recordingOpen}
-        onClose={() => setRecordingOpen(false)}
-        script={script}
-      />
-
-      {/* Per-scene AI edit modal */}
+      <ScriptDiff open={diffOpen} onClose={() => setDiffOpen(false)} original={generatedScript} edited={localScript}/>
+      <RecordingStudio open={recordingOpen} onClose={() => setRecordingOpen(false)} script={script}/>
       <SceneEditModal
         open={!!editTarget}
         onClose={() => setEditTarget(null)}
@@ -626,16 +450,6 @@ export default function ScriptStudio() {
         element={editTarget?.element}
         script={script}
         onApply={handleApplyEdit}
-      />
-
-      <Confirm
-        open={confirmRegen}
-        onCancel={() => setConfirmRegen(false)}
-        onConfirm={handleRegen}
-        kicker="Reset the press"
-        title="Re-forge from scratch?"
-        message="Your current draft will be replaced with a new one using the selected voice and length. The saved version in your library is safe."
-        confirmLabel="Re-forge"
       />
     </div>
   )

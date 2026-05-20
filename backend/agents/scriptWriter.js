@@ -28,7 +28,7 @@ export async function writeScript(topic, topicTitle, tone, format, niche, creato
   const toneGuide = TONE_GUIDES[tone] || TONE_GUIDES['educational']
   const totalSecs = format === '30s' ? '28-32' : format === '60s' ? '55-65' : '85-95'
 
-  const model = createGeminiModel({ temperature: 0.7, maxOutputTokens: 3000 })
+  const model = createGeminiModel({ temperature: 0.7, maxOutputTokens: 8000 })
 
   const contextBlock = creatorContext?.systemPrompt
     ? `\n${creatorContext.systemPrompt}\n\n---\n`

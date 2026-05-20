@@ -114,7 +114,10 @@ export function extractJson(text) {
   // Try to salvage by closing all open braces/brackets.
   if (!match) {
     const start = str.indexOf('{')
-    if (start === -1) throw new Error('No JSON object found in Gemini response')
+    if (start === -1) {
+      console.error('[gemini] No JSON found in response. Raw text:', str.slice(0, 500))
+      throw new Error('No JSON object found in Gemini response')
+    }
     let truncated = str.slice(start)
     // Remove trailing commas and incomplete last key-value
     truncated = truncated.replace(/,\s*$/, '')
