@@ -87,6 +87,75 @@ export function extractResponseText(response) {
 }
 
 /**
+ * Transcribe audio via Vertex AI REST API (inlineData).
+ * LangChain wrapper doesn't reliably support audio, so use REST directly.
+ * Returns { transcript, traits }.
+ */
+export async function transcribeAudio(audioBase64, mimeType = 'audio/webm') {
+  const credentials = parseCredentials()
+  const project = process.env.GOOGLE_CLOUD_PROJECT || credentials?.project_id
+  const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1'
+  const modelId = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+
+  if (!project) throw new Error('No GOOGLE_CLOUD_PROJECT configured')
+  if (!credentials) throw new Error('Service account credentials required for audio transcription')
+
+  const { JWT } = await import('google-auth-library')
+  const client = new JWT({
+    email: credentials.client_email,
+    key: credentials.private_key,
+    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+  })
+  const { token: accessToken } = await client.getAccessToken()
+
+  const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${modelId}:generateContent`
+
+  const body = {
+    contents: [{
+      role: 'user',
+      parts: [
+        {
+          text: `Listen to this voice recording.
+1. Transcribe it word-for-word.
+2. Identify 3-5 communication style traits from HOW the person speaks (not what they say).
+
+Return ONLY valid JSON:
+{
+  "transcript": "exact words spoken",
+  "traits": ["trait1", "trait2", "trait3"]
+}
+
+Trait examples: "conversational", "high energy", "direct and punchy", "uses rhetorical questions", "storytelling style", "casual", "motivational", "vulnerable", "humorous", "uses pause for emphasis"`
+        },
+        { inlineData: { mimeType: mimeType.split(';')[0], data: audioBase64 } }
+      ]
+    }],
+    generationConfig: { temperature: 0.1, maxOutputTokens: 1000 }
+  }
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+
+  if (!response.ok) {
+    const errText = await response.text()
+    throw new Error(`Vertex AI audio: ${response.status} — ${errText.slice(0, 300)}`)
+  }
+
+  const data = await response.json()
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  if (!text) throw new Error('Empty audio response from Vertex AI')
+
+  const parsed = extractJson(text)
+  return {
+    transcript: parsed.transcript || '',
+    traits: Array.isArray(parsed.traits) ? parsed.traits : []
+  }
+}
+
+/**
  * Robustly extract and parse JSON from Gemini response text.
  * Handles: markdown code fences, trailing commas, single-line responses.
  */

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useUser } from '@clerk/clerk-react'
 
 function useCountUp(target, duration = 1800) {
   const [val, setVal] = useState(0)
@@ -161,6 +162,8 @@ function ReasoningViz() {
 
 export default function Landing() {
   const navigate = useNavigate()
+  const { isSignedIn } = useUser()
+  const goSignIn = () => navigate(isSignedIn ? '/dashboard' : '/sign-in')
 
   return (
     <div className="landing">
@@ -176,7 +179,7 @@ export default function Landing() {
               <a href="#pricing">Pricing</a>
             </nav>
             <div className="row" style={{ gap: 8 }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => navigate('/sign-in')}>Sign in</button>
+              <button className="btn btn-ghost btn-sm" onClick={goSignIn}>Sign in</button>
               <button className="btn btn-primary btn-sm" onClick={() => navigate('/sign-up')}>Get started free</button>
             </div>
           </div>
@@ -204,7 +207,7 @@ export default function Landing() {
                 <button className="btn btn-primary btn-lg" onClick={() => navigate('/sign-up')}>
                   Start for free <span className="arrow">→</span>
                 </button>
-                <button className="btn btn-line btn-lg" onClick={() => navigate('/sign-in')}>Sign in</button>
+                <button className="btn btn-line btn-lg" onClick={goSignIn}>Sign in</button>
               </div>
               <p className="small" style={{ marginTop: 14, color: 'var(--mute-2)' }}>No credit card · Free tier included</p>
             </div>

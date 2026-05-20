@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { requireAuth } from '../lib/auth.js'
 import { getMemorySummary, buildCreatorContext } from '../lib/memory.js'
 import { findSimilarScripts, getCoveredTopics } from '../lib/embeddings.js'
+import { transcribeAudio } from '../lib/gemini.js'
 
 const router = Router()
 
@@ -54,6 +55,21 @@ router.post('/context', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('[memory/context]', err.message)
     res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: err.message } })
+  }
+})
+
+// POST /api/memory/transcribe-voice — transcribe audio clip + extract voice traits via Gemini
+router.post('/transcribe-voice', requireAuth, async (req, res) => {
+  try {
+    const { audioBase64, mimeType = 'audio/webm' } = req.body
+    if (!audioBase64) {
+      return res.status(400).json({ success: false, error: { code: 'MISSING_AUDIO', message: 'audioBase64 required' } })
+    }
+    const result = await transcribeAudio(audioBase64, mimeType)
+    res.json({ success: true, data: result })
+  } catch (err) {
+    console.error('[memory/transcribe-voice]', err.message)
+    res.status(500).json({ success: false, error: { code: 'TRANSCRIBE_ERROR', message: err.message } })
   }
 })
 

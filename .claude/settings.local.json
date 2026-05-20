@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git pull:*)",
+      "Bash(taskkill:*)",
+      "Bash(cmd.exe /c \"taskkill /PID 1840 /F\")",
+      "Bash(cmd.exe /c \"taskkill /F /PID 1840\" 2>&1)",
+      "Bash(cmd.exe /c \"tasklist /FI \\\\\"PID eq 1840\\\\\"\")",
+      "Bash(powershell -Command \"Stop-Process -Id 1840 -Force; Write-Host 'killed'\")",
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:3000/health\" -UseBasicParsing -ErrorAction SilentlyContinue)",
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:8081\" -UseBasicParsing -ErrorAction SilentlyContinue)"
+    ]
+  }
+}

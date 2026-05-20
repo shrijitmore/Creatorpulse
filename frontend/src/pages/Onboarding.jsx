@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/clerk-react'
-import { updateNiches, completeOnboarding } from '../lib/api.js'
+import { updateNiches, completeOnboarding, transcribeVoice } from '../lib/api.js'
 import { CONTENT_FORMATS, LANGUAGE_STYLES, CREATOR_GOALS } from '../constants/platforms.js'
 
 const PLATFORMS = [
@@ -121,29 +121,183 @@ function AudienceStep({ onNext }) {
   )
 }
 
+const SUPPORTED_MIME_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4']
+
 function VoiceStep({ onNext, onSkip }) {
+  const [mode, setMode] = useState('text')         // 'text' | 'mic'
   const [v, setV] = useState('')
+  const [recState, setRecState] = useState('idle') // 'idle' | 'recording' | 'processing' | 'error'
+  const [duration, setDuration] = useState(0)
+  const [errorMsg, setErrorMsg] = useState('')
+  const mediaRef = useRef(null)
+  const chunksRef = useRef([])
+  const timerRef = useRef(null)
+  const streamRef = useRef(null)
+  const mimeRef = useRef('audio/webm')
+
+  const MAX_SECONDS = 90
+  const hasMicSupport = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
+
+  React.useEffect(() => () => {
+    clearInterval(timerRef.current)
+    streamRef.current?.getTracks().forEach(t => t.stop())
+  }, [])
+
+  const startRecording = async () => {
+    setErrorMsg('')
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      streamRef.current = stream
+      const supportedMime = SUPPORTED_MIME_TYPES.find(t => MediaRecorder.isTypeSupported(t)) || ''
+      const mr = new MediaRecorder(stream, supportedMime ? { mimeType: supportedMime } : {})
+      mimeRef.current = mr.mimeType || 'audio/webm'
+      chunksRef.current = []
+      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
+      mr.onstop = handleStop
+      mr.start(250)
+      mediaRef.current = mr
+      setRecState('recording')
+      setDuration(0)
+      timerRef.current = setInterval(() => {
+        setDuration(d => {
+          if (d + 1 >= MAX_SECONDS) { stopRecording(); return d + 1 }
+          return d + 1
+        })
+      }, 1000)
+    } catch (err) {
+      setErrorMsg(err.name === 'NotAllowedError'
+        ? 'Mic access denied — allow microphone in your browser settings.'
+        : 'Could not access microphone.')
+    }
+  }
+
+  const stopRecording = () => {
+    clearInterval(timerRef.current)
+    if (mediaRef.current?.state === 'recording') mediaRef.current.stop()
+    streamRef.current?.getTracks().forEach(t => t.stop())
+    setRecState('processing')
+  }
+
+  const handleStop = async () => {
+    const blob = new Blob(chunksRef.current, { type: mimeRef.current })
+    if (blob.size < 500) {
+      setRecState('idle')
+      setErrorMsg('Recording too short — hold for at least 3 seconds.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = async () => {
+      const base64 = reader.result.split(',')[1]
+      try {
+        const result = await transcribeVoice(base64, mimeRef.current.split(';')[0])
+        setV(result.transcript || '')
+        setMode('text')
+        setRecState('idle')
+        if (!result.transcript) setErrorMsg('No speech detected — paste your script instead.')
+      } catch {
+        setMode('text')
+        setRecState('idle')
+        setErrorMsg('Transcription failed — paste your script instead.')
+      }
+    }
+    reader.readAsDataURL(blob)
+  }
+
+  const fmt = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
+
   return (
     <div>
-      <h2 className="h3" style={{ marginBottom: 8 }}>Optional: paste a caption or script</h2>
-      <p className="body" style={{ marginBottom: 32 }}>
-        AI will learn your tone, energy, sentence rhythm — and write scripts that sound like YOU.
+      <h2 className="h3" style={{ marginBottom: 8 }}>Optional: capture your voice</h2>
+      <p className="body" style={{ marginBottom: 24 }}>
+        AI learns your tone, energy, sentence rhythm — writes scripts that sound like YOU.
         Without a sample, scripts use your style + goal settings.
       </p>
-      <textarea
-        className="textarea mono"
-        rows={7}
-        value={v}
-        onChange={e => setV(e.target.value)}
-        style={{ fontFamily: 'var(--mono)', fontSize: 13 }}
-        placeholder="Paste a recent caption, reel script, or how you talk on camera..."
-      />
-      <div style={{ marginTop: 12, padding: '12px 16px', background: 'var(--paper-2)', border: '1px solid var(--line)', borderRadius: 10 }}>
-        <p className="small"><strong style={{ color: 'var(--ink)' }}>Tip:</strong> Even 2–3 sentences helps. The more you paste, the more the scripts sound like you.</p>
+
+      <div className="voice-tabs">
+        <button className={`voice-tab ${mode === 'text' ? 'active' : ''}`} onClick={() => setMode('text')}>
+          Paste text
+        </button>
+        {hasMicSupport && (
+          <button className={`voice-tab ${mode === 'mic' ? 'active' : ''}`} onClick={() => setMode('mic')}>
+            Record voice
+          </button>
+        )}
       </div>
+
+      {mode === 'text' && (
+        <>
+          <textarea
+            className="textarea mono"
+            rows={7}
+            value={v}
+            onChange={e => setV(e.target.value)}
+            style={{ fontFamily: 'var(--mono)', fontSize: 13 }}
+            placeholder="Paste a recent caption, reel script, or how you talk on camera..."
+          />
+          <div style={{ marginTop: 12, padding: '12px 16px', background: 'var(--paper-2)', border: '1px solid var(--line)', borderRadius: 10 }}>
+            <p className="small"><strong style={{ color: 'var(--ink)' }}>Tip:</strong> Even 2–3 sentences helps. The more you paste, the more the scripts sound like you.</p>
+          </div>
+        </>
+      )}
+
+      {mode === 'mic' && (
+        <div className="voice-recorder">
+          {recState === 'idle' && (
+            <>
+              <button className="mic-btn" onClick={startRecording} aria-label="Start recording">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                  <line x1="12" y1="19" x2="12" y2="23"/>
+                  <line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>
+              </button>
+              <p className="body" style={{ marginTop: 16, color: 'var(--ink)', fontWeight: 500 }}>Click to start recording</p>
+              <p className="small" style={{ marginTop: 8, color: 'var(--mute)', maxWidth: 300, textAlign: 'center', lineHeight: 1.6 }}>
+                Explain a topic in your niche, read a past script, or just talk for 15–30 seconds.
+              </p>
+            </>
+          )}
+
+          {recState === 'recording' && (
+            <>
+              <button className="mic-btn recording" onClick={stopRecording} aria-label="Stop recording">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="6" width="12" height="12" rx="2"/>
+                </svg>
+              </button>
+              <p className="body" style={{ marginTop: 16, color: 'var(--ink)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                {fmt(duration)}
+              </p>
+              <p className="small" style={{ marginTop: 6, color: 'var(--mute)' }}>Recording… click to stop</p>
+              {duration >= MAX_SECONDS - 10 && (
+                <p className="small" style={{ marginTop: 4, color: '#f59e0b' }}>Stopping soon ({MAX_SECONDS - duration}s left)</p>
+              )}
+            </>
+          )}
+
+          {recState === 'processing' && (
+            <>
+              <div className="mic-btn" style={{ cursor: 'default', opacity: 0.5 }}>
+                <span className="tdot" style={{ margin: 0 }}/>
+              </div>
+              <p className="body" style={{ marginTop: 16, color: 'var(--mute)' }}>Analysing your voice…</p>
+              <p className="small" style={{ marginTop: 6, color: 'var(--mute-2)' }}>Transcribing + extracting style traits</p>
+            </>
+          )}
+        </div>
+      )}
+
+      {errorMsg && (
+        <p className="small" style={{ marginTop: 10, color: '#ef4444' }}>{errorMsg}</p>
+      )}
+
       <div className="onb-nav">
         <button className="btn btn-ghost" onClick={onSkip}>Skip for now</button>
-        <button className="btn btn-primary" disabled={!v.trim()} onClick={() => onNext(`Trained on your sample (${v.trim().length} chars)`)}>
+        <button
+          className="btn btn-primary"
+          disabled={!v.trim() || recState === 'recording' || recState === 'processing'}
+          onClick={() => onNext(`Trained on your sample (${v.trim().length} chars)`)}>
           Train my voice →
         </button>
       </div>

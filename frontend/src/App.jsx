@@ -106,7 +106,7 @@ function AppRoutes() {
 
     const path = window.location.pathname
     // Don't redirect on public pages
-    if (['/sign-in', '/sign-up'].some(p => path.startsWith(p))) return
+    if (path === '/' || ['/sign-in', '/sign-up'].some(p => path.startsWith(p))) return
 
     if (!onboarded && path !== '/onboarding') {
       navigate('/onboarding', { replace: true })
@@ -126,11 +126,7 @@ function AppRoutes() {
     <ToastProvider>
       <Routes>
         {/* ── Public routes — no auth required ── */}
-        <Route path="/" element={
-          isSignedIn
-            ? (onboarded ? null : null)  // handled by redirect above
-            : <Landing/>
-        }/>
+        <Route path="/" element={<Landing/>}/>
         <Route path="/sign-in/*" element={<SignInPage/>}/>
         <Route path="/sign-up/*" element={<SignUpPage/>}/>
 
