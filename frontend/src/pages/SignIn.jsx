@@ -13,8 +13,8 @@ export default function SignInPage() {
             <div className="row" style={{ gap: 12, marginTop: 28 }}>
               <div className="auth-avatar"/>
               <div>
-                <p style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--ink)' }}>Maya Chen</p>
-                <p className="small">1.2M on Instagram · fitness creator</p>
+                <p className="auth-author-name">Maya Chen</p>
+                <p className="auth-author-sub">1.2M on Instagram · fitness creator</p>
               </div>
             </div>
           </div>

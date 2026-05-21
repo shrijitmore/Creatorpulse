@@ -214,11 +214,11 @@ function VoiceStep({ onNext, onSkip }) {
       </p>
 
       <div className="voice-tabs">
-        <button className={`voice-tab ${mode === 'text' ? 'active' : ''}`} onClick={() => setMode('text')}>
+        <button className={`voice-tab ${mode === 'text' ? 'active' : ''}`} onClick={() => { setMode('text'); setErrorMsg('') }}>
           Paste text
         </button>
         {hasMicSupport && (
-          <button className={`voice-tab ${mode === 'mic' ? 'active' : ''}`} onClick={() => setMode('mic')}>
+          <button className={`voice-tab ${mode === 'mic' ? 'active' : ''}`} onClick={() => { setMode('mic'); setErrorMsg('') }}>
             Record voice
           </button>
         )}
@@ -390,6 +390,31 @@ function Welcome({ name, answers, onLaunch }) {
   )
 }
 
+// ─── Launching ────────────────────────────────────────────────────────────────
+
+function Launching({ name }) {
+  const LINES = [
+    'Fetching live trends for your niches…',
+    'Calibrating your AI voice model…',
+    'Personalising your feed…',
+    'Almost there…',
+  ]
+  const [idx, setIdx] = useState(0)
+  React.useEffect(() => {
+    const t = setInterval(() => setIdx(i => Math.min(i + 1, LINES.length - 1)), 1400)
+    return () => clearInterval(t)
+  }, [])
+  return (
+    <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '48px 0', gap: 20 }}>
+      <div style={{ width: 44, height: 44, borderRadius: '50%', border: '2px solid var(--paper-3)', borderTopColor: 'var(--ink)', animation: 'spin 0.8s linear infinite' }}/>
+      <div>
+        <h2 className="h3" style={{ marginBottom: 8 }}>Opening your dashboard</h2>
+        <p className="small" style={{ color: 'var(--mute)', minHeight: 18, transition: 'opacity .3s' }}>{LINES[idx]}</p>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Onboarding ──────────────────────────────────────────────────────────
 
 export default function Onboarding() {
@@ -421,6 +446,8 @@ export default function Onboarding() {
   }
 
   const handleLaunch = async () => {
+    setPhase('launching')
+
     const styleNicheMap = { educational: 'tech', entertaining: 'lifestyle', controversial: 'finance', storytelling: 'fitness' }
     const selectedStyles = (answers.styles || '').split(', ').map(s => s.trim().toLowerCase())
     const niches = [...new Set(selectedStyles.map(s => styleNicheMap[s]).filter(Boolean))]
@@ -529,6 +556,8 @@ export default function Onboarding() {
         <div className="onb-card">
           {phase === 'processing'
             ? <Processing name={answers.name} onDone={() => setPhase('welcome')}/>
+            : phase === 'launching'
+            ? <Launching name={answers.name}/>
             : phase === 'welcome'
             ? <Welcome name={answers.name} answers={answers} onLaunch={handleLaunch}/>
             : (

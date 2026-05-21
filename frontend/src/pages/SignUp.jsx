@@ -48,8 +48,8 @@ export default function SignUpPage() {
             <div className="row" style={{ gap: 12, marginTop: 28 }}>
               <div className="auth-avatar"/>
               <div>
-                <p style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--ink)' }}>Rohan Verma</p>
-                <p className="small">850K on YouTube · finance creator</p>
+                <p className="auth-author-name">Rohan Verma</p>
+                <p className="auth-author-sub">850K on YouTube · finance creator</p>
               </div>
             </div>
           </div>
