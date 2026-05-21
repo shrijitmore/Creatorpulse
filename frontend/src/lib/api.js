@@ -181,6 +181,14 @@ export async function getSimilarScripts(topic, niche) {
   return data.data || data
 }
 
+export async function transcribeVoice(audioBase64, mimeType = 'audio/webm') {
+  const data = await apiFetch('/api/memory/transcribe-voice', {
+    method: 'POST',
+    body: JSON.stringify({ audioBase64, mimeType })
+  })
+  return data.data || data
+}
+
 export async function saveUserPreferences(prefs) {
   if (prefs.languageStyle || prefs.contentFormat) {
     await updateProfile(prefs).catch(() => {})

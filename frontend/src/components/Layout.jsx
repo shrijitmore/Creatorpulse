@@ -1,36 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation, Outlet } from 'react-router-dom'
 import { UserButton, useUser, useClerk } from '@clerk/clerk-react'
-import { Icon, Wordmark, Logomark, Button, IconButton, Tooltip, Chip, Kbd } from './ui.jsx'
 import { getSavedScripts } from '../lib/api.js'
 
-const NAV_GROUPS = [
-  {
-    label: 'Workspace',
-    items: [
-      { to: '/dashboard', label: 'Dashboard',     icon: Icon.Home,     shortcut: 'G D' },
-      { to: '/studio',    label: 'Script Studio',  icon: Icon.Studio,   shortcut: 'G S' },
-      { to: '/saved',     label: 'Library',        icon: Icon.Bookmark, shortcut: 'G L' },
-    ]
-  },
-  {
-    label: 'Account',
-    items: [
-      { to: '/profile',  label: 'Creator profile', icon: Icon.Profile,  shortcut: 'G P' },
-      { to: '/settings', label: 'Settings',         icon: Icon.Settings, shortcut: 'G ,' },
-    ]
-  },
+const NAV = [
+  { to: '/dashboard', label: 'Dashboard',      icon: '◈', shortcut: 'G D' },
+  { to: '/studio',    label: 'Script Studio',  icon: '✦', shortcut: 'G S' },
+  { to: '/saved',     label: 'Library',        icon: '⊟', shortcut: 'G L' },
+  { to: '/profile',   label: 'Creator profile', icon: '◎', shortcut: 'G P' },
+  { to: '/settings',  label: 'Settings',        icon: '⊕', shortcut: 'G ,' },
 ]
 
 const ROUTE_TITLES = {
-  '/dashboard': { kicker: 'Trends',       title: 'Dashboard' },
-  '/studio':    { kicker: 'Composition',  title: 'Script studio' },
-  '/saved':     { kicker: 'Archive',      title: 'Library' },
-  '/profile':   { kicker: 'Identity',     title: 'Creator profile' },
-  '/settings':  { kicker: 'Preferences',  title: 'Settings' },
+  '/dashboard': { kicker: 'Trends',      title: 'Dashboard' },
+  '/studio':    { kicker: 'Composition', title: 'Script studio' },
+  '/saved':     { kicker: 'Archive',     title: 'Library' },
+  '/profile':   { kicker: 'Identity',    title: 'Creator profile' },
+  '/settings':  { kicker: 'Preferences', title: 'Settings' },
 }
 
-// ─── Command Palette ─────────────────────────────────────────────────────────
+// ─── Command palette ──────────────────────────────────────────────────────────
 
 function CommandPalette({ open, onClose }) {
   const navigate = useNavigate()
@@ -47,66 +36,73 @@ function CommandPalette({ open, onClose }) {
 
   if (!open) return null
 
-  const go = (path) => { navigate(path); onClose() }
+  const go = (path) => { navigate(path); onClose(); setQ('') }
 
   const groups = [
     { label: 'Go to', items: [
-      { label: 'Dashboard',        hint: "Today's trends",   icon: <Icon.Home size={14}/>,     action: () => go('/dashboard') },
-      { label: 'Script Studio',    hint: 'Compose a script', icon: <Icon.Studio size={14}/>,   action: () => go('/studio') },
-      { label: 'Creator profile',  hint: 'DNA & voice',      icon: <Icon.Profile size={14}/>,  action: () => go('/profile') },
-      { label: 'Library',          hint: 'Saved scripts',    icon: <Icon.Bookmark size={14}/>, action: () => go('/saved') },
-      { label: 'Settings',         hint: 'Preferences',      icon: <Icon.Settings size={14}/>, action: () => go('/settings') },
+      { label: 'Dashboard',       hint: "Today's trends",   action: () => go('/dashboard') },
+      { label: 'Script Studio',   hint: 'Compose a script', action: () => go('/studio') },
+      { label: 'Creator profile', hint: 'DNA & voice',      action: () => go('/profile') },
+      { label: 'Library',         hint: 'Saved scripts',    action: () => go('/saved') },
+      { label: 'Settings',        hint: 'Preferences',      action: () => go('/settings') },
     ]},
     { label: 'Actions', items: [
-      { label: 'Generate a new script', hint: 'From top trend',     icon: <Icon.Wand size={14}/>,    action: () => go('/studio') },
-      { label: 'Refresh the feed',      hint: 'Fetch new signals',  icon: <Icon.Refresh size={14}/>, action: () => go('/dashboard') },
+      { label: 'Generate a new script', hint: 'From top trend',    action: () => go('/studio') },
+      { label: 'Refresh the feed',      hint: 'Fetch new signals', action: () => go('/dashboard') },
     ]},
   ]
 
-  const f = (s) => s.toLowerCase().includes(q.toLowerCase())
-  const filtered = groups.map(g => ({ ...g, items: g.items.filter(i => f(i.label) || f(i.hint)) })).filter(g => g.items.length)
+  const filtered = groups
+    .map(g => ({ ...g, items: g.items.filter(i => i.label.toLowerCase().includes(q.toLowerCase()) || i.hint.toLowerCase().includes(q.toLowerCase())) }))
+    .filter(g => g.items.length)
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-start justify-center pt-[14vh] px-4 fade-in"
-      style={{ background: 'rgba(26,23,20,0.32)', backdropFilter: 'blur(2px)' }}
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 80, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '14vh', paddingLeft: 16, paddingRight: 16, background: 'rgba(10,10,10,0.28)', backdropFilter: 'blur(2px)' }}
       onMouseDown={onClose}>
-      <div className="card w-full max-w-[560px] overflow-hidden"
-        onMouseDown={e => e.stopPropagation()}
-        style={{ animation: 'fadeUp .2s cubic-bezier(.16,1,.3,1) forwards' }}>
-        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-line">
-          <Icon.Search size={14} className="text-ink3"/>
-          <input ref={inputRef} value={q} onChange={e => setQ(e.target.value)}
+      <div
+        className="card fade-up"
+        style={{ width: '100%', maxWidth: 540, overflow: 'hidden', boxShadow: 'var(--sh-pop)' }}
+        onMouseDown={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: '1px solid var(--line)' }}>
+          <span style={{ color: 'var(--mute)', fontSize: 14 }}>⌕</span>
+          <input
+            ref={inputRef}
+            value={q}
+            onChange={e => setQ(e.target.value)}
             placeholder="Type a page, command, or trend…"
-            className="flex-1 bg-transparent outline-none text-[15px] placeholder:text-ink3" style={{ border: 'none' }}/>
-          <Kbd>esc</Kbd>
+            style={{ flex: 1, fontSize: 15, background: 'none', border: 'none', outline: 'none', color: 'var(--ink)' }}
+          />
+          <span className="chip btn-sm" style={{ fontFamily: 'var(--mono)', fontSize: 11, padding: '4px 8px' }}>esc</span>
         </div>
-        <div className="max-h-[60vh] overflow-y-auto py-2">
+        <div style={{ maxHeight: '60vh', overflowY: 'auto', padding: '8px 0' }}>
           {filtered.length === 0 ? (
-            <div className="px-4 py-8 text-center">
-              <p className="text-[13.5px] text-ink3">Nothing matches "{q}".</p>
+            <div style={{ padding: '32px 16px', textAlign: 'center' }}>
+              <p className="small">Nothing matches "{q}".</p>
             </div>
           ) : filtered.map(g => (
-            <div key={g.label} className="px-2 pb-2">
-              <p className="px-3 pt-2 pb-1 text-[10.5px] uppercase tracking-[0.08em] font-medium text-ink3">{g.label}</p>
+            <div key={g.label} style={{ padding: '0 8px 8px' }}>
+              <p className="label" style={{ padding: '8px 12px 4px', marginBottom: 0 }}>{g.label}</p>
               {g.items.map(it => (
                 <button key={it.label} onClick={it.action}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left hover:bg-paper2 group">
-                  <span className="w-7 h-7 rounded-md bg-paper2 border border-line flex items-center justify-center text-ink2">{it.icon}</span>
-                  <span className="flex-1 min-w-0">
-                    <p className="text-[13.5px] text-ink truncate">{it.label}</p>
-                    <p className="text-[11.5px] text-ink3 truncate">{it.hint}</p>
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 8, textAlign: 'left', transition: 'background var(--tx-fast)' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--paper-2)'}
+                  onMouseLeave={e => e.currentTarget.style.background = ''}>
+                  <span style={{ flex: 1 }}>
+                    <p style={{ fontSize: 13.5, color: 'var(--ink)', fontWeight: 500 }}>{it.label}</p>
+                    <p className="small" style={{ marginTop: 1 }}>{it.hint}</p>
                   </span>
-                  <Icon.Arrow size={12} className="text-ink4 opacity-0 group-hover:opacity-100 transition-opacity"/>
+                  <span style={{ color: 'var(--mute-2)', fontSize: 12 }}>→</span>
                 </button>
               ))}
             </div>
           ))}
         </div>
-        <div className="px-4 py-2.5 border-t border-line bg-paper flex items-center gap-3 text-[11px] text-ink3 font-mono">
-          <span className="flex items-center gap-1"><Kbd>↑</Kbd><Kbd>↓</Kbd> navigate</span>
-          <span className="flex items-center gap-1"><Kbd>↵</Kbd> select</span>
-          <span className="flex-1"/>
-          <span>Creatorpulse</span>
+        <div style={{ padding: '10px 16px', borderTop: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 16 }}>
+          <span className="small mono" style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>↑↓ navigate</span>
+          <span className="small mono" style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>↵ select</span>
+          <span style={{ flex: 1 }}/>
+          <span className="small" style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>Creatorpulse</span>
         </div>
       </div>
     </div>
@@ -115,16 +111,15 @@ function CommandPalette({ open, onClose }) {
 
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
 
-function Sidebar({ profile }) {
+function Sidebar({ onCommand }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useUser()
   const { signOut } = useClerk()
   const [recentScripts, setRecentScripts] = useState([])
 
-  const name = user?.fullName || user?.firstName || profile?.name || 'Creator'
+  const name = user?.fullName || user?.firstName || 'Creator'
   const email = user?.primaryEmailAddress?.emailAddress || ''
-  const initials = name.split(' ').map(w => w[0]).slice(0, 2).join('')
 
   useEffect(() => {
     getSavedScripts()
@@ -136,81 +131,85 @@ function Sidebar({ profile }) {
   }, [])
 
   return (
-    <aside className="hidden lg:flex flex-col flex-shrink-0 w-[248px] border-r border-line bg-paper">
+    <aside className="side">
       {/* Brand */}
-      <div className="px-4 pt-4 pb-3 border-b border-line">
-        <div className="flex items-center justify-between">
-          <Wordmark />
-          <IconButton icon={<Icon.ChevD size={13}/>} label="Switch workspace" />
-        </div>
-        <div className="mt-3 flex items-center gap-2.5 px-2.5 py-1.5 rounded-md hover:bg-paper2 transition-colors cursor-pointer group"
-          onClick={() => navigate('/profile')}>
-          <UserButton
-            afterSignOutUrl="/sign-in"
-            appearance={{ elements: { avatarBox: 'w-6 h-6 rounded-md' } }}
-          />
-          <div className="flex-1 min-w-0 text-left" onClick={e => { e.stopPropagation(); navigate('/profile') }}>
-            <p className="text-[12.5px] font-medium text-ink truncate">{name}</p>
-            <p className="text-[10.5px] text-ink3 truncate">{email || 'Free · Creator'}</p>
-          </div>
-          <Icon.ChevD size={12} className="text-ink3 group-hover:text-ink"/>
-        </div>
-      </div>
+      <a className="brand" href="/"><span className="mark"/>Creatorpulse</a>
 
-      {/* Nav */}
-      <nav className="flex-1 px-3 py-3 overflow-y-auto">
-        {NAV_GROUPS.map(group => (
-          <div key={group.label} className="mb-5">
-            <p className="px-2.5 mb-1.5 text-[10.5px] font-medium uppercase tracking-[0.10em] text-ink3">{group.label}</p>
-            <div className="space-y-0.5">
-              {group.items.map(({ to, label, icon: Icn }) => {
-                const active = location.pathname === to || (to !== '/' && location.pathname.startsWith(to))
-                return (
-                  <button key={to} data-active={String(active)} onClick={() => navigate(to)} className="side-link w-full">
-                    <Icn size={15} stroke={1.7}/>
-                    <span className="flex-1">{label}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        ))}
+      {/* Navigation */}
+      <nav className="side-nav">
+        {NAV.map(({ to, label, icon }) => {
+          const active = location.pathname === to || (to !== '/' && location.pathname.startsWith(to))
+          return (
+            <button
+              key={to}
+              className={`side-link ${active ? 'on' : ''}`}
+              onClick={() => navigate(to)}>
+              <span className="ic">{icon}</span>
+              <span className="side-label">{label}</span>
+            </button>
+          )
+        })}
 
-        <div className="border-t border-line my-3"/>
+        <div className="hr" style={{ margin: '12px 0' }}/>
 
+        {/* Quick action */}
+        <button className="side-link" onClick={onCommand}>
+          <span className="ic">⌕</span>
+          <span className="side-label" style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+            Search
+            <span className="chip" style={{ marginLeft: 'auto', fontSize: 10, padding: '2px 6px', fontFamily: 'var(--mono)' }}>⌘K</span>
+          </span>
+        </button>
+
+        {/* Recent scripts */}
         {recentScripts.length > 0 && (
-          <>
-            <p className="px-2.5 mb-1.5 text-[10.5px] font-medium uppercase tracking-[0.10em] text-ink3">Recent</p>
-            <div className="space-y-0.5">
-              {recentScripts.map(s => (
-                <button key={s.id}
-                  onClick={() => navigate(`/studio?topicId=${s.topicId || s.id}&title=${encodeURIComponent(s.topicTitle)}&niche=${encodeURIComponent(s.niche || '')}`)}
-                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-paper2 transition-colors text-left group">
-                  <span className="w-1 h-1 rounded-full bg-ink4 flex-shrink-0"/>
-                  <span className="text-[12.5px] text-ink2 truncate group-hover:text-ink">{s.topicTitle}</span>
-                </button>
-              ))}
-            </div>
-          </>
+          <div style={{ marginTop: 16 }}>
+            <p className="label" style={{ padding: '0 12px', marginBottom: 4 }}>Recent</p>
+            {recentScripts.map(s => (
+              <button
+                key={s.id}
+                className="side-link"
+                onClick={() => navigate(`/studio?topicId=${s.topicId || s.id}&title=${encodeURIComponent(s.topicTitle)}&niche=${encodeURIComponent(s.niche || '')}`)}>
+                <span className="ic" style={{ fontSize: 8 }}>●</span>
+                <span className="side-label" style={{ fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.topicTitle}</span>
+              </button>
+            ))}
+          </div>
         )}
       </nav>
 
       {/* Footer */}
-      <div className="px-3 py-3 border-t border-line space-y-2">
-        <div className="px-2.5 py-2 rounded-md bg-paper2 border border-line">
-          <p className="text-[11px] font-medium text-ink mb-0.5">Upgrade to Pro</p>
-          <p className="text-[10.5px] text-ink3 leading-snug mb-2">Unlimited scripts, voice training, team workspace.</p>
-          <Button variant="primary" size="sm" className="w-full justify-center">Upgrade</Button>
+      <div className="side-foot">
+        {/* Upgrade block */}
+        <div className="side-up">
+          <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink)', marginBottom: 4 }}>Upgrade to Pro</p>
+          <p className="small" style={{ marginBottom: 12 }}>Unlimited scripts, voice training, team workspace.</p>
+          <div className="side-bar"><i style={{ width: '20%' }}/></div>
+          <p className="small" style={{ marginTop: 6 }}>1 of 5 scripts used</p>
+          <button className="btn btn-primary btn-sm" style={{ width: '100%', justifyContent: 'center', marginTop: 12 }}>Upgrade</button>
         </div>
+
+        {/* User */}
+        <div className="side-user" onClick={() => navigate('/profile')} style={{ cursor: 'pointer' }}>
+          <div className="avatar" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <UserButton
+              afterSignOutUrl="/sign-in"
+              appearance={{ elements: { avatarBox: 'w-full h-full', userButtonBox: 'w-full h-full' } }}
+            />
+          </div>
+          <span style={{ flex: 1, overflow: 'hidden' }}>
+            <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</p>
+            <p className="small" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email || 'Free · Creator'}</p>
+          </span>
+        </div>
+
         <button
           onClick={() => signOut({ redirectUrl: '/sign-in' })}
-          className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-[12.5px] font-medium transition-colors hover:bg-[#F5DDD2] group"
-          style={{ color: 'var(--ink3)' }}
-          onMouseEnter={e => e.currentTarget.style.color = 'var(--error)'}
-          onMouseLeave={e => e.currentTarget.style.color = 'var(--ink3)'}
-        >
-          <Icon.Arrow size={14} style={{ transform: 'rotate(180deg)' }}/>
-          Sign out
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, fontSize: 13, color: 'var(--mute)', transition: 'all var(--tx-fast)', width: '100%' }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(192,74,46,0.08)'; e.currentTarget.style.color = 'rgb(192,74,46)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = 'var(--mute)' }}>
+          <span>↩</span>
+          <span className="side-label">Sign out</span>
         </button>
       </div>
     </aside>
@@ -224,37 +223,31 @@ function Topbar({ onCommand }) {
   const t = ROUTE_TITLES[location.pathname] || ROUTE_TITLES['/dashboard']
 
   return (
-    <header className="h-[56px] flex items-center gap-4 px-6 border-b border-line bg-paper sticky top-0 z-30">
-      <div className="flex items-center gap-2 text-[12.5px]">
-        <span className="text-ink3">{t.kicker}</span>
-        <Icon.ChevR size={12} className="text-ink4"/>
-        <span className="text-ink font-medium">{t.title}</span>
+    <header style={{ height: 56, display: 'flex', alignItems: 'center', gap: 16, padding: '0 24px', borderBottom: '1px solid var(--line)', background: 'var(--paper)', position: 'sticky', top: 0, zIndex: 30 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
+        <span style={{ color: 'var(--mute)' }}>{t.kicker}</span>
+        <span style={{ color: 'var(--mute-2)' }}>›</span>
+        <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{t.title}</span>
       </div>
-
-      <div className="flex-1"/>
-
-      <button onClick={onCommand} className="topbar-search">
-        <Icon.Search size={13}/>
-        <span className="flex-1 text-left">Search trends, scripts, settings…</span>
-        <span className="flex items-center gap-0.5"><Kbd>⌘</Kbd><Kbd>K</Kbd></span>
+      <div style={{ flex: 1 }}/>
+      <button
+        onClick={onCommand}
+        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--paper-2)', fontSize: 13, color: 'var(--mute)', cursor: 'pointer', flex: '0 1 320px' }}>
+        <span>⌕</span>
+        <span style={{ flex: 1, textAlign: 'left' }}>Search trends, scripts…</span>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>⌘K</span>
       </button>
-
-      <div className="hidden md:flex items-center gap-2 h-8 px-2.5 rounded-md border border-line bg-card">
-        <span className="w-1.5 h-1.5 rounded-full bg-successc live-dot"/>
-        <span className="text-[11px] font-medium text-ink2">Live</span>
-      </div>
-
-      <IconButton icon={<Icon.Help size={15}/>} label="Help"/>
-      <div className="lg:hidden">
-        <UserButton afterSignOutUrl="/sign-in" appearance={{ elements: { avatarBox: 'w-8 h-8' } }}/>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, border: '1px solid var(--line)' }}>
+        <span className="status" style={{ fontSize: 0 }}/>{/* uses status::before for dot */}
+        <span style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--ink-2)', fontFamily: 'var(--mono)', letterSpacing: '0.06em' }}>LIVE</span>
       </div>
     </header>
   )
 }
 
-// ─── Layout shell ────────────────────────────────────────────────────────────
+// ─── Layout ──────────────────────────────────────────────────────────────────
 
-export default function Layout({ profile = {} }) {
+export default function Layout() {
   const [paletteOpen, setPaletteOpen] = useState(false)
 
   useEffect(() => {
@@ -269,11 +262,13 @@ export default function Layout({ profile = {} }) {
   }, [])
 
   return (
-    <div className="flex min-h-screen bg-paper">
-      <Sidebar profile={profile}/>
-      <div className="flex-1 flex flex-col min-w-0">
+    <div className="app-shell">
+      <Sidebar onCommand={() => setPaletteOpen(true)}/>
+      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: '100vh' }}>
         <Topbar onCommand={() => setPaletteOpen(true)}/>
-        <main className="flex-1 overflow-y-auto"><Outlet/></main>
+        <main style={{ flex: 1, overflowY: 'auto' }}>
+          <Outlet/>
+        </main>
       </div>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)}/>
     </div>

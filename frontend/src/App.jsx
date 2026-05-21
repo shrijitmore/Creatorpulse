@@ -18,9 +18,9 @@ import SignUpPage from './pages/SignUp.jsx'
 
 function CheckingScreen() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-paper gap-4">
-      <Logomark size={40}/>
-      <div className="flex items-center gap-1.5">
+    <div className="loading-screen">
+      <a className="brand" href="/"><span className="mark"></span>Creatorpulse</a>
+      <div style={{ display:'flex', gap:4, marginTop:8 }}>
         <span className="tdot"/><span className="tdot"/><span className="tdot"/>
       </div>
     </div>
@@ -106,7 +106,7 @@ function AppRoutes() {
 
     const path = window.location.pathname
     // Don't redirect on public pages
-    if (['/sign-in', '/sign-up'].some(p => path.startsWith(p))) return
+    if (path === '/' || ['/sign-in', '/sign-up'].some(p => path.startsWith(p))) return
 
     if (!onboarded && path !== '/onboarding') {
       navigate('/onboarding', { replace: true })
@@ -126,11 +126,7 @@ function AppRoutes() {
     <ToastProvider>
       <Routes>
         {/* ── Public routes — no auth required ── */}
-        <Route path="/" element={
-          isSignedIn
-            ? (onboarded ? null : null)  // handled by redirect above
-            : <Landing/>
-        }/>
+        <Route path="/" element={<Landing/>}/>
         <Route path="/sign-in/*" element={<SignInPage/>}/>
         <Route path="/sign-up/*" element={<SignUpPage/>}/>
 
