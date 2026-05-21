@@ -28,7 +28,7 @@ function NameStep({ onNext }) {
   return (
     <div>
       <h2 className="h3" style={{ marginBottom: 8 }}>What should I call you?</h2>
-      <p className="body" style={{ marginBottom: 32 }}>Your creator name — how you appear to your audience.</p>
+      <p className="body" style={{ marginBottom: 32 }}>Your creator name, how you appear to your audience.</p>
       <div className="row" style={{ gap: 12 }}>
         <input
           ref={ref}
@@ -104,7 +104,7 @@ function AudienceStep({ onNext }) {
   return (
     <div>
       <h2 className="h3" style={{ marginBottom: 8 }}>Who's your ideal viewer?</h2>
-      <p className="body" style={{ marginBottom: 32 }}>One sentence — or let AI infer from your niche + style.</p>
+      <p className="body" style={{ marginBottom: 32 }}>One sentence, or let AI infer from your niche + style.</p>
       <textarea
         className="textarea"
         rows={4}
@@ -112,7 +112,7 @@ function AudienceStep({ onNext }) {
         onChange={e => setV(e.target.value)}
         placeholder="e.g. 25–35 year olds building solo brands — they want shortcuts that don't feel like shortcuts."
       />
-      <p className="small" style={{ marginTop: 8, color: 'var(--mute-2)' }}>Leave blank — AI will infer from your niche + style.</p>
+      <p className="small" style={{ marginTop: 8, color: 'var(--mute-2)' }}>Leave blank, AI will infer from your niche + style.</p>
       <div className="onb-nav">
         <button className="btn btn-ghost" onClick={() => onNext('(ai-infer)')}>Skip → AI will infer</button>
         <button className="btn btn-primary" onClick={() => onNext(v.trim() || '(ai-infer)')}>Continue →</button>
@@ -209,7 +209,7 @@ function VoiceStep({ onNext, onSkip }) {
     <div>
       <h2 className="h3" style={{ marginBottom: 8 }}>Optional: capture your voice</h2>
       <p className="body" style={{ marginBottom: 24 }}>
-        AI learns your tone, energy, sentence rhythm — writes scripts that sound like YOU.
+        AI learns your tone, energy, sentence rhythm and writes scripts that sound like YOU.
         Without a sample, scripts use your style + goal settings.
       </p>
 
@@ -363,7 +363,7 @@ function Welcome({ name, answers, onLaunch }) {
         <span style={{ color: 'var(--mute)' }}>Your AI cofounder is calibrated.</span>
       </h2>
       <p className="body" style={{ marginBottom: 32, maxWidth: 480 }}>
-        I'll scan your niches every morning and surface the 3 trends most worth your time —
+        I'll scan your niches every morning and surface the 3 trends most worth your time,
         in your language, for your platform, in your voice.
       </p>
       <div className="card" style={{ marginBottom: 32, maxWidth: 560 }}>
@@ -458,7 +458,7 @@ export default function Onboarding() {
     if (k === 'platforms') return (
       <TileStep
         question="Which platforms are you creating for?"
-        sub="Pick all that apply — this shapes where we look for trends."
+        sub="Pick all that apply. This shapes where we look for trends."
         items={PLATFORMS}
         multi
         onNext={v => submit('platforms', v)}
@@ -482,7 +482,7 @@ export default function Onboarding() {
     if (k === 'styles') return (
       <TileStep
         question="How would you describe your content style?"
-        sub="Pick what fits — your scripts will match."
+        sub="Pick what fits. Your scripts will match."
         items={STYLES}
         multi
         onNext={v => submit('styles', v)}

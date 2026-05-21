@@ -241,7 +241,7 @@ function MemorySidebar({ niche }) {
           <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>AI Memory</p>
           <span className="chip" style={{ marginLeft: 'auto', fontSize: 10 }}><span className="dot"/> Live</span>
         </div>
-        <p className="small">What I'm using to write this — pulled from your archive.</p>
+        <p className="small">What I'm using to write this, pulled from your archive.</p>
       </div>
 
       {loading ? (
@@ -250,7 +250,7 @@ function MemorySidebar({ niche }) {
         </div>
       ) : recentScripts.length === 0 ? (
         <div className="card">
-          <p className="small" style={{ fontStyle: 'italic' }}>No past scripts yet — generate some to build memory.</p>
+          <p className="small" style={{ fontStyle: 'italic' }}>No past scripts yet. Generate some to build memory.</p>
         </div>
       ) : (
         <div className="card">

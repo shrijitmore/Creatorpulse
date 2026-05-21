@@ -178,7 +178,7 @@ export default function Profile() {
             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--line)' }}>
               <span className="kicker">Identity</span>
               <h2 style={{ fontSize: 16, fontWeight: 500, color: 'var(--ink)', marginTop: 4 }}>Creator DNA</h2>
-              <p className="small" style={{ marginTop: 4 }}>The pattern we see in your work — style, audience, goal.</p>
+              <p className="small" style={{ marginTop: 4 }}>The pattern we see in your work: style, audience, goal.</p>
             </div>
             <div style={{ padding: 20 }}>
               {loading ? (
@@ -212,7 +212,7 @@ export default function Profile() {
                     <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: 12, alignItems: 'start' }}>
                       <span className="label" style={{ marginBottom: 0 }}>Voice sample</span>
                       <span style={{ fontSize: 13.5, color: profile?.rawVoiceSample ? 'var(--pulse)' : 'var(--mute)' }}>
-                        {profile?.rawVoiceSample ? '✓ Trained · fingerprint active' : 'No sample — add one to improve scripts'}
+                        {profile?.rawVoiceSample ? '✓ Trained · fingerprint active' : 'No sample. Add one to improve scripts'}
                       </span>
                     </div>
                   </div>
@@ -242,7 +242,7 @@ export default function Profile() {
             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--line)' }}>
               <span className="kicker">Memory</span>
               <h2 style={{ fontSize: 16, fontWeight: 500, color: 'var(--ink)', marginTop: 4 }}>Topic memory</h2>
-              <p className="small" style={{ marginTop: 4 }}>Topics from your generated scripts — sized by frequency.</p>
+              <p className="small" style={{ marginTop: 4 }}>Topics from your generated scripts, sized by frequency.</p>
             </div>
             <div style={{ padding: 20 }}>
               {loading ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{Array.from({ length: 6 }).map((_, i) => <SkelBox key={i} h={28}/>)}</div>
@@ -308,7 +308,7 @@ export default function Profile() {
               {loading ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{Array.from({ length: 3 }).map((_, i) => <SkelBox key={i} h={56}/>)}</div>
               ) : topHooks.length === 0 ? (
-                <p className="body" style={{ fontStyle: 'italic' }}>No scripts yet — generate your first from the dashboard.</p>
+                <p className="body" style={{ fontStyle: 'italic' }}>No scripts yet. Generate your first from the dashboard.</p>
               ) : (
                 <ul className="best-ul">
                   {topHooks.map((h, i) => (

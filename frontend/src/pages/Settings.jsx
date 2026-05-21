@@ -160,7 +160,7 @@ export default function Settings() {
         <div>
           <span className="kicker">Preferences</span>
           <h1 style={{ fontSize: 24, fontWeight: 500, letterSpacing: '-0.02em', color: 'var(--ink)', marginTop: 6 }}>Settings</h1>
-          <p className="body" style={{ marginTop: 4 }}>Niches, account, integrations — the dials behind the curtain.</p>
+          <p className="body" style={{ marginTop: 4 }}>Niches, account, integrations. The dials behind the curtain.</p>
         </div>
       </div>
 
@@ -244,7 +244,7 @@ export default function Settings() {
           <div className="set-block" ref={el => sectionRefs.current['creation'] = el} id="creation">
             <span className="kicker">Creation</span>
             <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)', marginTop: 4, marginBottom: 4 }}>Content preferences</h2>
-            <p className="body">Tell the AI how you create — it shapes every script and coaching session.</p>
+            <p className="body">Tell the AI how you create. It shapes every script and coaching session.</p>
 
             <div style={{ marginTop: 22 }}>
               <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--mono)' }}>Language style</p>
@@ -364,7 +364,7 @@ export default function Settings() {
                     ))}
                   </ul>
                   <button className="btn btn-line btn-sm" style={{ marginTop: 'auto' }}>
-                    Upgrade to {plan.tier} — coming soon
+                    Upgrade to {plan.tier} (coming soon)
                   </button>
                 </div>
               ))}
