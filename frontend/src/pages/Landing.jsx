@@ -200,7 +200,7 @@ export default function Landing() {
           <div className="ln-belowhero">
             <div>
               <p className="ln-sub">
-                Your AI cofounder for content — discovers what's trending in your niche,
+                Your AI cofounder for content. Discovers what's trending in your niche,
                 writes scripts in your voice, and coaches you on delivery.
               </p>
               <div className="row" style={{ gap: 12, marginTop: 32 }}>
@@ -288,7 +288,7 @@ export default function Landing() {
               <div className="f-ix"><span>02</span><span>Voice-matched scripts</span></div>
               <h3>Scripts that sound like you, not generic AI</h3>
               <p className="body" style={{ marginTop: 16 }}>
-                AI writes complete reel scripts in your language — Hinglish, Hindi, English,
+                AI writes complete reel scripts in your language: Hinglish, Hindi, English,
                 regional. Trained on your past captions so every line sounds like you.
               </p>
               <div className="f-tags">
@@ -332,7 +332,7 @@ export default function Landing() {
               <h3>Record yourself. AI catches what's killing your confidence.</h3>
               <p className="body" style={{ marginTop: 16 }}>
                 Record yourself reading the script. AI catches filler words, trailing
-                confidence, wrong emphasis — scene by scene. Ship better content.
+                confidence, wrong emphasis, scene by scene. Ship better content.
               </p>
               <div className="f-tags">
                 <span className="chip active">Filler detection</span>
@@ -431,7 +431,7 @@ export default function Landing() {
                 tier: 'Pro', price: '₹999', per: '/month',
                 desc: 'For creators who ship consistently.',
                 features: ['Unlimited scripts', 'All platforms + languages', 'Instagram trends', 'AI voice coaching', 'Priority scraping', 'Script history'],
-                cta: 'Start Pro — coming soon', hero: true,
+                cta: 'Start Pro (coming soon)', hero: true,
               },
               {
                 tier: 'Agency', price: '₹4,999', per: '/month',

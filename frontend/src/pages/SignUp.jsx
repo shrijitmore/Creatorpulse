@@ -44,7 +44,7 @@ export default function SignUpPage() {
         <div className="auth-side reverse" style={{ order: 2 }}>
           <div/>
           <div className="auth-quote">
-            <p>"Creatorpulse is the unfair advantage I wish I had when I started. Every trend, every script, every coaching note — in one place."</p>
+            <p>"Creatorpulse is the unfair advantage I wish I had when I started. Every trend, every script, every coaching note in one place."</p>
             <div className="row" style={{ gap: 12, marginTop: 28 }}>
               <div className="auth-avatar"/>
               <div>

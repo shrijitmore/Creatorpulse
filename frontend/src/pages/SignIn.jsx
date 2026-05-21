@@ -22,7 +22,7 @@ export default function SignInPage() {
             <li>Trend feed updated every hour across 3 platforms</li>
             <li>Scripts in your language, in your voice</li>
             <li>Voice coaching catches what kills confidence on camera</li>
-            <li>Free tier — no credit card needed</li>
+            <li>Free tier, no credit card needed</li>
           </ul>
         </div>
 

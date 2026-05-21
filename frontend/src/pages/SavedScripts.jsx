@@ -218,7 +218,7 @@ export default function SavedScripts() {
         <div>
           <span className="kicker">Archive</span>
           <h1 style={{ fontSize: 24, fontWeight: 500, letterSpacing: '-0.02em', color: 'var(--ink)', marginTop: 6 }}>Library</h1>
-          <p className="body" style={{ marginTop: 4 }}>Every saved script — sorted, tagged, ready to reopen in the studio.</p>
+          <p className="body" style={{ marginTop: 4 }}>Every saved script, sorted, tagged, ready to reopen in the studio.</p>
         </div>
         <button className="btn btn-primary btn-sm" onClick={() => navigate('/dashboard')}>+ New from dashboard</button>
       </div>

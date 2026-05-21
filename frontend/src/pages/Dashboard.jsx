@@ -136,7 +136,7 @@ function IdlePhase({ selectedNiches, onToggleNiche, onFetch }) {
         What's moving today?
       </h1>
       <p className="body" style={{ textAlign: 'center', maxWidth: 440, marginBottom: 40 }}>
-        Pick your niches and we'll scan Reddit, YouTube, and Instagram for the best signals — summarised and ranked just for you.
+        Pick your niches and we'll scan Reddit, YouTube, and Instagram for the best signals, summarised and ranked just for you.
       </p>
       <div className="card" style={{ width: '100%', maxWidth: 580 }}>
         <span className="label" style={{ marginBottom: 12 }}>Select niches</span>

@@ -222,13 +222,13 @@ export default function RecordingStudio({ open, onClose, script }) {
         {(phase === 'teleprompter' || phase === 'recording') && scene && (
           <div className="space-y-3">
             <div>
-              <p className="kicker mb-1.5">📷 Visuals — do this first</p>
+              <p className="kicker mb-1.5">📷 Visuals: do this first</p>
               <div className="card-soft rounded-lg p-3 text-[13.5px] text-ink2 leading-relaxed">
                 {scene.visuals}
               </div>
             </div>
             <div>
-              <p className="kicker mb-1.5">🎙️ Voiceover — say this</p>
+              <p className="kicker mb-1.5">🎙️ Voiceover: say this</p>
               <div className="card p-4 border-l-[3px] text-[16px] font-medium text-ink leading-relaxed"
                 style={{ borderLeftColor:'var(--terra)', background: phase === 'recording' ? '#FFFBF7' : '#fff' }}>
                 "{scene.voiceover}"
