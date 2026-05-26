@@ -1,7 +1,8 @@
 import { createRequire } from 'module'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { rm } from 'fs/promises'
+import { rm, writeFile, unlink } from 'fs/promises'
+import { existsSync } from 'fs'
 
 const require = createRequire(import.meta.url)
 
@@ -28,10 +29,31 @@ function initPg(connectionString) {
 
 // ── PGlite (local dev fallback) ───────────────────────────────────────────────
 
+const LOCK_FILE = join(tmpdir(), 'pglite-trendforge.lock')
+
+async function acquireProcessLock() {
+  // If a stale lock file exists from a crashed process, remove it first.
+  if (existsSync(LOCK_FILE)) {
+    try {
+      const pid = parseInt((await import('fs')).readFileSync(LOCK_FILE, 'utf8'))
+      // Check if that PID is still alive (platform-safe: kill 0 just checks)
+      try { process.kill(pid, 0) } catch { await unlink(LOCK_FILE).catch(() => {}) }
+    } catch { await unlink(LOCK_FILE).catch(() => {}) }
+  }
+  // Write our own PID as the lock
+  await writeFile(LOCK_FILE, String(process.pid))
+}
+
+async function releaseLock() {
+  await unlink(LOCK_FILE).catch(() => {})
+}
+
 async function initPglite() {
   const { PGlite } = await import('@electric-sql/pglite')
   const dbPath = join(tmpdir(), 'pglite-trendforge')
   console.log(`[db] PGlite path: ${dbPath}`)
+
+  await acquireProcessLock()
 
   async function tryOpen(path) {
     const c = new PGlite(path)
@@ -43,14 +65,13 @@ async function initPglite() {
   try {
     client = await tryOpen(dbPath)
   } catch (err) {
-    // node --watch restarts before the old process fully releases the lock,
-    // or the data dir got corrupted by two simultaneous processes.
+    // node --watch restarts before the old process releases the lock.
     console.warn('[db] PGlite init failed, retrying in 1.5s...')
     await new Promise(r => setTimeout(r, 1500))
     try {
       client = await tryOpen(dbPath)
-    } catch (err2) {
-      // Data dir is unrecoverable — wipe and start fresh (dev only).
+    } catch {
+      // Data dir is unrecoverable — wipe and recreate (dev only, last resort).
       console.warn('[db] PGlite still failing, resetting data directory...')
       await rm(dbPath, { recursive: true, force: true })
       client = await tryOpen(dbPath)
@@ -71,6 +92,7 @@ export async function closeDb() {
     try { await pgliteClient.close() } catch {}
     pgliteClient = null
   }
+  await releaseLock()
   db = null
 }
 
