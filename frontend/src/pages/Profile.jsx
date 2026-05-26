@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getProfile } from '../lib/api.js'
+import { getProfile, resetOnboarding } from '../lib/api.js'
 import AudienceAgeEditor from '../features/profile/AudienceAgeEditor.jsx'
 import DeliveryGrowth from '../features/profile/DeliveryGrowth.jsx'
 
@@ -74,13 +74,28 @@ export default function Profile() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [audienceAge, setAudienceAge] = useState(null)
+  const [recalibrating, setRecalibrating] = useState(false)
 
-  useEffect(() => {
+  const handleRecalibrate = async () => {
+    setRecalibrating(true)
+    try {
+      await resetOnboarding()
+      navigate('/onboarding')
+    } catch (e) {
+      setError('Failed to reset profile. Please try again.')
+      setRecalibrating(false)
+    }
+  }
+
+  const loadProfile = () => {
+    setLoading(true)
     getProfile()
       .then(d => { setData(d); setAudienceAge(d?.profile?.audienceAge || null) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => { loadProfile() }, [])
 
   const storedProfile = (() => { try { return JSON.parse(localStorage.getItem('trendforge_profile') || '{}') } catch { return {} } })()
   const profile = data?.profile || null
@@ -129,8 +144,10 @@ export default function Profile() {
           <p className="body" style={{ marginTop: 4 }}>{handle} · {profile?.onboardingDone ? 'trained · forge-ready' : 'onboarding incomplete'}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-line btn-sm">↻ Recalibrate</button>
-          <button className="btn btn-line btn-sm">✎ Edit profile</button>
+          <button className="btn btn-line btn-sm" onClick={handleRecalibrate} disabled={recalibrating}>
+            {recalibrating ? '↻ Resetting…' : '↻ Recalibrate'}
+          </button>
+          <button className="btn btn-line btn-sm" onClick={() => navigate('/settings')}>✎ Edit profile</button>
           <button className="btn btn-primary btn-sm" onClick={() => navigate('/dashboard')}>Open dashboard →</button>
         </div>
       </div>
@@ -381,6 +398,7 @@ export default function Profile() {
           )}
         </div>
       </div>
+
     </div>
   )
 }

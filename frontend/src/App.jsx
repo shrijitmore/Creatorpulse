@@ -13,6 +13,9 @@ import Settings from './pages/Settings.jsx'
 import Profile from './pages/Profile.jsx'
 import SignInPage from './pages/SignIn.jsx'
 import SignUpPage from './pages/SignUp.jsx'
+import Plans from './pages/Plans.jsx'
+import Checkout from './pages/Checkout.jsx'
+import PlanSuccess from './pages/PlanSuccess.jsx'
 
 // ─── Loading screen ───────────────────────────────────────────────────────────
 
@@ -140,6 +143,9 @@ function AppRoutes() {
               <Route path="/saved"     element={<SavedScripts/>}/>
               <Route path="/profile"   element={<Profile/>}/>
               <Route path="/settings"  element={<Settings/>}/>
+              <Route path="/plans"     element={<Plans/>}/>
+              <Route path="/checkout"  element={<Checkout/>}/>
+              <Route path="/plans/success" element={<PlanSuccess/>}/>
             </Route>
           </>
         )}

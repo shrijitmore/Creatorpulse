@@ -12,11 +12,14 @@ const NAV = [
 ]
 
 const ROUTE_TITLES = {
-  '/dashboard': { kicker: 'Trends',      title: 'Dashboard' },
-  '/studio':    { kicker: 'Composition', title: 'Script studio' },
-  '/saved':     { kicker: 'Archive',     title: 'Library' },
-  '/profile':   { kicker: 'Identity',    title: 'Creator profile' },
-  '/settings':  { kicker: 'Preferences', title: 'Settings' },
+  '/dashboard':     { kicker: 'Trends',      title: 'Dashboard' },
+  '/studio':        { kicker: 'Composition', title: 'Script studio' },
+  '/saved':         { kicker: 'Archive',     title: 'Library' },
+  '/profile':       { kicker: 'Identity',    title: 'Creator profile' },
+  '/settings':      { kicker: 'Preferences', title: 'Settings' },
+  '/plans':         { kicker: 'Billing',     title: 'Plans & pricing' },
+  '/checkout':      { kicker: 'Billing',     title: 'Checkout' },
+  '/plans/success': { kicker: 'Billing',     title: 'Upgrade complete' },
 }
 
 // ─── Command palette ──────────────────────────────────────────────────────────
@@ -161,17 +164,21 @@ function Sidebar({ onCommand }) {
           </span>
         </button>
 
-        {/* Recent scripts */}
         {recentScripts.length > 0 && (
-          <div style={{ marginTop: 16 }}>
-            <p className="label" style={{ padding: '0 12px', marginBottom: 4 }}>Recent</p>
-            {recentScripts.map(s => (
+          <div style={{ marginTop: 14 }}>
+            <p style={{ padding: '0 10px', marginBottom: 2, fontFamily: 'var(--mono)', fontSize: 9.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: '#A8A8A8' }}>Recent</p>
+            {recentScripts.slice(0, 3).map(s => (
               <button
                 key={s.id}
-                className="side-link"
-                onClick={() => navigate(`/studio?topicId=${s.topicId || s.id}&title=${encodeURIComponent(s.topicTitle)}&niche=${encodeURIComponent(s.niche || '')}`)}>
-                <span className="ic" style={{ fontSize: 8 }}>●</span>
-                <span className="side-label" style={{ fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.topicTitle}</span>
+                title={s.topicTitle}
+                onClick={() => navigate(`/studio?topicId=${s.topicId || s.id}&title=${encodeURIComponent(s.topicTitle)}&niche=${encodeURIComponent(s.niche || '')}`)}
+                onMouseEnter={e => { e.currentTarget.style.background = '#FAFAFA'; e.currentTarget.style.color = '#0A0A0A' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#767676' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 10px', borderRadius: 7, background: 'transparent', border: 'none', cursor: 'pointer', color: '#767676', fontFamily: 'var(--sans)', fontSize: 12.5, textAlign: 'left', transition: 'background 0.18s, color 0.18s', overflow: 'hidden' }}>
+                <span style={{ width: 16, display: 'flex', justifyContent: 'center', alignItems: 'center', flexShrink: 0 }}>
+                  <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#D4D4D4', display: 'block', flexShrink: 0 }}/>
+                </span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{s.topicTitle}</span>
               </button>
             ))}
           </div>

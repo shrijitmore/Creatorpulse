@@ -276,7 +276,8 @@ button { cursor: pointer; }
 .auth-side { padding: 48px; background: var(--ink); border-right: 0; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; }
 .auth-side::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 80% 60% at 20% 80%, rgba(34,197,94,0.06) 0%, transparent 60%), radial-gradient(ellipse 60% 50% at 80% 20%, rgba(200,231,255,0.05) 0%, transparent 55%); pointer-events: none; }
 .auth-side.reverse { order: 2; }
-.auth-main { padding: 48px; display: flex; align-items: center; justify-content: center; }
+.auth-main { padding: 48px; display: flex; align-items: center; justify-content: center; overflow: visible; }
+.cl-rootBox, .cl-card, .cl-cardBox, .cl-main { overflow: visible !important; }
 .auth-side.reverse + .auth-main { order: 1; }
 .auth-quote { max-width: 440px; position: relative; }
 .auth-quote p { font-size: clamp(22px, 2.4vw, 30px); font-weight: 500; letter-spacing: -0.025em; line-height: 1.2; color: var(--paper); }
@@ -387,6 +388,7 @@ button { cursor: pointer; }
 .agent.now .ag-ix { background: #fff; color: var(--ink); border-color: var(--ink); }
 .agent.now .ag-ix::after { content: ''; position: absolute; inset: 0; background: conic-gradient(from 0deg, transparent 60%, var(--iri-2) 80%, transparent 100%); animation: spin 2.2s linear infinite; opacity: .5; }
 @keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.65s linear infinite; transform-origin: center; display: inline-block; }
 .agent.now::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--ink), transparent); animation: shimmer 1.6s ease-in-out infinite; }
 @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 .studio-grid { display: grid; grid-template-columns: 1fr 360px; gap: 24px; align-items: start; }
@@ -399,6 +401,8 @@ button { cursor: pointer; }
 .scene.active::before { content: ''; position: absolute; left: -24px; top: 18px; bottom: 18px; width: 2px; background: var(--ink); }
 .sc-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .sc-ix { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mute); }
+.sc-actions { opacity: 0; transition: opacity var(--tx-fast); }
+.scene:hover .sc-actions { opacity: 1; }
 .sc-edit-btn { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em; color: var(--mute); padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); transition: all var(--tx-fast); cursor: pointer; }
 .sc-edit-btn:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .sc-line { font-size: 17px; line-height: 1.55; color: var(--ink); max-width: 680px; }

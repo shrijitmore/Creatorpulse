@@ -118,17 +118,17 @@ router.patch('/', requireAuth, async (req, res) => {
     const merged = { ...(existing || {}), ...updates }
 
     const profile = await saveCreatorProfile(req.userId, {
-      creatorName: merged.creator_name || merged.creatorName,
-      platforms: merged.platforms,
-      contentStyles: merged.content_styles || merged.contentStyles,
-      audiencePersona: merged.audience_persona || merged.audiencePersona,
-      audienceAge: merged.audience_age || merged.audienceAge || null,
-      primaryGoal: merged.primary_goal || merged.primaryGoal,
-      rawVoiceSample: merged.raw_voice_sample || merged.rawVoiceSample,
-      languageStyle: merged.language_style || merged.languageStyle || 'English',
-      contentFormat: merged.content_format || merged.contentFormat || 'on-camera',
-      voiceTraits: merged.voice_traits || merged.voiceTraits || [],
-      nicheStrengths: merged.niche_strengths || merged.nicheStrengths || {}
+      creatorName:     merged.creatorName     || merged.creator_name,
+      platforms:       merged.platforms       || [],
+      contentStyles:   merged.contentStyles   || merged.content_styles   || [],
+      audiencePersona: merged.audiencePersona || merged.audience_persona || '',
+      audienceAge:     merged.audienceAge     ?? merged.audience_age     ?? null,
+      primaryGoal:     merged.primaryGoal     || merged.primary_goal     || '',
+      rawVoiceSample:  merged.rawVoiceSample  || merged.raw_voice_sample || '',
+      languageStyle:   merged.languageStyle   || merged.language_style   || 'English',
+      contentFormat:   merged.contentFormat   || merged.content_format   || 'on-camera',
+      voiceTraits:     merged.voiceTraits     || merged.voice_traits     || [],
+      nicheStrengths:  merged.nicheStrengths  || merged.niche_strengths  || {},
     })
 
     res.json({ success: true, data: { profile } })

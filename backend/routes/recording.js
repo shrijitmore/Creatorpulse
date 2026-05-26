@@ -46,7 +46,7 @@ Expected tone: ${scriptTone}
 Creator's language style: ${languageStyle}
 Content format: ${contentFormat}
 Niche: ${niche}
-${profile ? `Creator voice profile: ${(profile.voice_traits || []).join(', ')}` : ''}
+${profile ? `Creator voice profile: ${(Array.isArray(profile.voice_traits) ? profile.voice_traits : JSON.parse(profile.voice_traits || '[]')).join(', ')}` : ''}
 
 Analyse this audio recording for:
 1. Script accuracy — did they say the right words? Note specific deviations.

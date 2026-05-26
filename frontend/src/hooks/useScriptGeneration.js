@@ -8,11 +8,23 @@ const INITIAL_STEPS = [
   { step: 4, label: 'Generating hooks & copy...', icon: '🎣', status: 'pending' }
 ]
 
-export function useScriptGeneration() {
+function cacheKey(topicId) { return `sg_cache_${topicId}` }
+
+function readCache(topicId) {
+  if (!topicId) return null
+  try { return JSON.parse(sessionStorage.getItem(cacheKey(topicId))) } catch { return null }
+}
+
+function writeCache(topicId, data) {
+  if (!topicId) return
+  try { sessionStorage.setItem(cacheKey(topicId), JSON.stringify(data)) } catch {}
+}
+
+export function useScriptGeneration(topicId) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [steps, setSteps] = useState(INITIAL_STEPS)
-  const [script, setScript] = useState(null)
-  const [contentKit, setContentKit] = useState(null)
+  const [script, setScript] = useState(() => readCache(topicId)?.script ?? null)
+  const [contentKit, setContentKit] = useState(() => readCache(topicId)?.contentKit ?? null)
   const [error, setError] = useState(null)
   const [regenerating, setRegenerating] = useState({})
   const cancelRef = useRef(null)
@@ -21,7 +33,7 @@ export function useScriptGeneration() {
     setSteps(prev => prev.map(s => s.step === stepNum ? { ...s, status } : s))
   }, [])
 
-  const generate = useCallback((topicId, topicTitle, niche, tone, format) => {
+  const generate = useCallback((tid, topicTitle, niche, tone, format) => {
     if (cancelRef.current) cancelRef.current()
 
     setIsGenerating(true)
@@ -31,13 +43,14 @@ export function useScriptGeneration() {
     setSteps(INITIAL_STEPS)
 
     const cancel = generateScript(
-      topicId, topicTitle, niche, tone, format,
+      tid, topicTitle, niche, tone, format,
       ({ step, status }) => updateStep(step, status),
       ({ script: generatedScript, contentKit: generatedKit }) => {
         setScript(generatedScript)
         setContentKit(generatedKit)
         setIsGenerating(false)
         setSteps(prev => prev.map(s => ({ ...s, status: 'done' })))
+        writeCache(tid, { script: generatedScript, contentKit: generatedKit })
       },
       (err) => {
         console.error('Generation error:', err)
@@ -86,7 +99,8 @@ export function useScriptGeneration() {
     setContentKit(null)
     setError(null)
     setRegenerating({})
-  }, [])
+    if (topicId) try { sessionStorage.removeItem(cacheKey(topicId)) } catch {}
+  }, [topicId])
 
   return { isGenerating, steps, script, contentKit, error, regenerating, generate, cancelGeneration, regenerateContentSection, reset }
 }

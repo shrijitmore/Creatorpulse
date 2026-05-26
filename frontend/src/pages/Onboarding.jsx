@@ -99,23 +99,98 @@ function TileStep({ question, sub, items, multi = false, onNext }) {
   )
 }
 
+const AUDIENCE_GROUPS = [
+  {
+    category: 'Age range',
+    items: ['13–17', '18–24', '25–34', '35–44', '45+'],
+  },
+  {
+    category: 'Who they are',
+    items: ['Students', 'Young professionals', 'Entrepreneurs', 'Side hustlers', 'Job seekers', 'Working parents', 'Fitness beginners', 'Tech enthusiasts', 'Creators', 'Small business owners'],
+  },
+  {
+    category: 'What they want',
+    items: ['shortcuts that work', 'career growth', 'financial freedom', 'fitness results', 'motivation & mindset', 'technical knowledge', 'practical advice', 'relatable content', 'inspiration', 'entertainment'],
+  },
+]
+
 function AudienceStep({ onNext }) {
-  const [v, setV] = useState('')
+  const [selected, setSelected] = useState({})
+  const [custom, setCustom] = useState('')
+
+  const toggle = (cat, item) => {
+    setSelected(prev => {
+      const cur = prev[cat] || []
+      return { ...prev, [cat]: cur.includes(item) ? cur.filter(x => x !== item) : [...cur, item] }
+    })
+  }
+
+  const isOn = (cat, item) => (selected[cat] || []).includes(item)
+
+  const buildPreview = () => {
+    const age  = selected['Age range'] || []
+    const who  = selected['Who they are'] || []
+    const want = selected['What they want'] || []
+    const parts = []
+    if (age.length)  parts.push(age.join(' / '))
+    if (who.length)  parts.push(who.join(', ').toLowerCase())
+    if (want.length) parts.push('who want ' + want.slice(0, 2).join(' & '))
+    return parts.join(' · ')
+  }
+
+  const hasChips = Object.values(selected).some(v => v.length > 0)
+  const canContinue = hasChips || custom.trim()
+  const preview = buildPreview()
+
   return (
     <div>
       <h2 className="h3" style={{ marginBottom: 8 }}>Who's your ideal viewer?</h2>
-      <p className="body" style={{ marginBottom: 32 }}>One sentence, or let AI infer from your niche + style.</p>
+      <p className="body" style={{ marginBottom: 28 }}>Pick from suggestions below, or describe them yourself.</p>
+
+      {AUDIENCE_GROUPS.map(({ category, items }) => (
+        <div key={category} style={{ marginBottom: 18 }}>
+          <p className="label" style={{ marginBottom: 8 }}>{category}</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+            {items.map(item => {
+              const active = isOn(category, item)
+              return (
+                <button
+                  key={item}
+                  onClick={() => toggle(category, item)}
+                  style={{ padding: '6px 14px', borderRadius: 999, border: `1px solid ${active ? 'var(--ink)' : 'var(--line)'}`, background: active ? 'var(--ink)' : 'var(--paper)', color: active ? 'var(--paper)' : 'var(--ink-2)', fontSize: 13, fontFamily: 'var(--sans)', cursor: 'pointer', transition: 'all 0.15s', fontWeight: active ? 500 : 400 }}>
+                  {item}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+
+      {hasChips && !custom && (
+        <div style={{ margin: '16px 0', padding: '12px 16px', background: 'var(--paper-2)', border: '1px solid var(--line)', borderRadius: 10 }}>
+          <p className="label" style={{ marginBottom: 4 }}>Preview</p>
+          <p style={{ fontSize: 13.5, color: 'var(--ink)', fontStyle: 'italic' }}>"{preview}"</p>
+        </div>
+      )}
+
       <textarea
         className="textarea"
-        rows={4}
-        value={v}
-        onChange={e => setV(e.target.value)}
-        placeholder="e.g. 25–35 year olds building solo brands — they want shortcuts that don't feel like shortcuts."
+        rows={2}
+        value={custom}
+        onChange={e => setCustom(e.target.value)}
+        placeholder="Or describe in your own words…"
+        style={{ marginTop: 8 }}
       />
-      <p className="small" style={{ marginTop: 8, color: 'var(--mute-2)' }}>Leave blank, AI will infer from your niche + style.</p>
+      {custom && <p className="small" style={{ marginTop: 6, color: 'var(--mute-2)' }}>Custom description will be used instead of the chips above.</p>}
+
       <div className="onb-nav">
         <button className="btn btn-ghost" onClick={() => onNext('(ai-infer)')}>Skip → AI will infer</button>
-        <button className="btn btn-primary" onClick={() => onNext(v.trim() || '(ai-infer)')}>Continue →</button>
+        <button
+          className="btn btn-primary"
+          disabled={!canContinue}
+          onClick={() => onNext(custom.trim() || preview || '(ai-infer)')}>
+          Continue →
+        </button>
       </div>
     </div>
   )
@@ -502,7 +577,9 @@ export default function Onboarding() {
     if (k === 'language') return (
       <TileStep
         question="What language style do you create in?"
+        sub="Pick all that apply — scripts will blend your selected styles."
         items={LANGUAGE_STYLES.filter(l => l.id !== 'other')}
+        multi
         onNext={v => submit('language', v)}
       />
     )

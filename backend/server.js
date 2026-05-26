@@ -17,6 +17,7 @@ import profileRouter from './routes/profile.js'
 import memoryRouter from './routes/memory.js'
 import sceneRouter from './routes/scene.js'
 import recordingRouter from './routes/recording.js'
+import billingRouter from './routes/billing.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -123,6 +124,49 @@ app.get('/api', (req, res) => {
   })
 })
 
+// ── Gemini test (dev only) ────────────────────────────────────────────────────
+
+app.get('/api/gemini-test', async (req, res) => {
+  try {
+    const { createGeminiModel, extractResponseText, extractJson, hasGeminiCredentials } = await import('./lib/gemini.js')
+    if (!hasGeminiCredentials()) {
+      return res.status(503).json({ ok: false, error: 'No Gemini credentials configured' })
+    }
+    const model = createGeminiModel({ temperature: 0.1, maxOutputTokens: 200 })
+    const response = await model.invoke('Return ONLY valid JSON: {"suggestion": "test suggestion", "reasoning": "test", "confidence": "high", "pros": ["a"], "cons": [], "cascadingChange": {"needed": false, "element": null, "reason": "", "suggestion": ""}, "dataSource": "style_suggestion"}')
+    const text = extractResponseText(response)
+    console.log('[gemini-test] raw response:', text.slice(0, 300))
+    const parsed = extractJson(text)
+    res.json({ ok: true, response: text.slice(0, 200), parsed })
+  } catch (err) {
+    const detail = err.cause?.message || err.message
+    console.error('[gemini-test] Error:', detail, err.stack?.split('\n').slice(0,4).join(' | '))
+    res.status(500).json({ ok: false, error: detail })
+  }
+})
+
+app.post('/api/scene-test', async (req, res) => {
+  try {
+    const { createGeminiModel, extractResponseText, extractJson } = await import('./lib/gemini.js')
+    const { sceneNumber = 2, element = 'visual', currentValue = 'Quick cuts: B-roll of people working', userPrompt = 'What if I look not in camera', tone = 'storytelling', niche = 'fitness' } = req.body || {}
+    const model = createGeminiModel({ temperature: 0.4, maxOutputTokens: 4000 })
+    const prompt = `You are a script coach helping a ${niche} content creator refine their reel script.
+CURRENT SCENE ${sceneNumber}:
+${element === 'visual' ? `Visual: "${currentValue}"` : `Voiceover: "${currentValue}"`}
+USER WANTS: "${userPrompt}"
+Return ONLY valid JSON: { "suggestion": "...", "reasoning": "...", "confidence": "high|medium|low", "pros": ["..."], "cons": [], "cascadingChange": { "needed": false, "element": null, "reason": "", "suggestion": "" }, "dataSource": "style_suggestion" }`
+    const response = await model.invoke(prompt)
+    const content = extractResponseText(response)
+    console.log('[scene-test] response preview:', content.slice(0, 200))
+    const parsed = extractJson(content)
+    res.json({ ok: true, parsed })
+  } catch (err) {
+    const detail = err.cause?.message || err.message
+    console.error('[scene-test] Error:', detail, err.stack?.split('\n').slice(0,3).join(' | '))
+    res.status(500).json({ ok: false, error: detail, errorType: err.constructor.name })
+  }
+})
+
 // ── Routes ────────────────────────────────────────────────────────────────────
 
 app.use('/api/auth', userRouter)
@@ -132,6 +176,7 @@ app.use('/api/profile', profileRouter)
 app.use('/api/memory', memoryRouter)
 app.use('/api/scene', sceneRouter)
 app.use('/api/recording', recordingRouter)
+app.use('/api/billing', billingRouter)
 
 // Trends routes
 app.use('/api/trends', trendsRouter)

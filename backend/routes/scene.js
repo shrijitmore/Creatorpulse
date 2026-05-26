@@ -16,6 +16,7 @@ router.use(requireAuth)
  *         currentValue, userPrompt, tone, niche, fullScript }
  */
 router.post('/edit', async (req, res) => {
+  console.log('[scene/edit] body keys:', Object.keys(req.body || {}), '| userId:', req.userId)
   try {
     const {
       sceneNumber,
@@ -32,8 +33,11 @@ router.post('/edit', async (req, res) => {
     }
 
     const profile = await getCreatorProfile(req.userId)
+    const voiceTraits = Array.isArray(profile?.voice_traits)
+      ? profile.voice_traits
+      : (typeof profile?.voice_traits === 'string' ? JSON.parse(profile.voice_traits || '[]') : [])
     const voiceContext = profile
-      ? `Creator voice: ${(profile.voice_traits || []).join(', ')} | Format: ${profile.content_format || 'on-camera'} | Language: ${profile.language_style || 'English'}`
+      ? `Creator voice: ${voiceTraits.join(', ')} | Format: ${profile.content_format || 'on-camera'} | Language: ${profile.language_style || 'English'}`
       : ''
 
     const model = createGeminiModel({ temperature: 0.4, maxOutputTokens: 4000 })
@@ -88,8 +92,9 @@ Rules:
 
     res.json({ success: true, data: parsed })
   } catch (err) {
-    console.error('[scene/edit] Error:', err.message)
-    res.status(500).json({ success: false, error: { code: 'EDIT_ERROR', message: err.message } })
+    const detail = err.cause?.message || err.response?.data?.error?.message || err.message
+    console.error('[scene/edit] Error:', detail, '\n', err.stack?.split('\n').slice(0,3).join('\n'))
+    res.status(500).json({ success: false, error: { code: 'EDIT_ERROR', message: detail } })
   }
 })
 
@@ -138,8 +143,9 @@ Generate a refined version based on their feedback. Return ONLY valid JSON:
 
     res.json({ success: true, data: parsed })
   } catch (err) {
-    console.error('[scene/followup] Error:', err.message)
-    res.status(500).json({ success: false, error: { code: 'FOLLOWUP_ERROR', message: err.message } })
+    const detail = err.cause?.message || err.response?.data?.error?.message || err.message
+    console.error('[scene/followup] Error:', detail)
+    res.status(500).json({ success: false, error: { code: 'FOLLOWUP_ERROR', message: detail } })
   }
 })
 
