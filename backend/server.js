@@ -6,7 +6,7 @@ import cors from 'cors'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import Redis from 'ioredis'
-import { getDb } from './db.js'
+import { getDb, closeDb } from './db.js'
 import { clerkMw } from './lib/auth.js'
 import { startScrapeJob, stopScrapeJob } from './jobs/scrapeJob.js'
 import trendsRouter from './routes/trends.js'
@@ -421,6 +421,7 @@ async function start() {
       server.close(async () => {
         try {
           stopScrapeJob()
+          await closeDb()
           await redis.quit()
           console.log('[server] Redis connection closed')
         } catch (_) {}

@@ -1,10 +1,12 @@
 import { createRequire } from 'module'
 import { tmpdir } from 'os'
 import { join } from 'path'
+import { rm } from 'fs/promises'
 
 const require = createRequire(import.meta.url)
 
 let db = null
+let pgliteClient = null
 
 // ── Supabase / PostgreSQL ─────────────────────────────────────────────────────
 
@@ -30,14 +32,46 @@ async function initPglite() {
   const { PGlite } = await import('@electric-sql/pglite')
   const dbPath = join(tmpdir(), 'pglite-trendforge')
   console.log(`[db] PGlite path: ${dbPath}`)
-  const client = new PGlite(dbPath)
-  await client.waitReady
+
+  async function tryOpen(path) {
+    const c = new PGlite(path)
+    await c.waitReady
+    return c
+  }
+
+  let client
+  try {
+    client = await tryOpen(dbPath)
+  } catch (err) {
+    // node --watch restarts before the old process fully releases the lock,
+    // or the data dir got corrupted by two simultaneous processes.
+    console.warn('[db] PGlite init failed, retrying in 1.5s...')
+    await new Promise(r => setTimeout(r, 1500))
+    try {
+      client = await tryOpen(dbPath)
+    } catch (err2) {
+      // Data dir is unrecoverable — wipe and start fresh (dev only).
+      console.warn('[db] PGlite still failing, resetting data directory...')
+      await rm(dbPath, { recursive: true, force: true })
+      client = await tryOpen(dbPath)
+    }
+  }
+
+  pgliteClient = client
   return {
     query: async (sql, params) => {
       const result = await client.query(sql, params)
       return { rows: result.rows }
     }
   }
+}
+
+export async function closeDb() {
+  if (pgliteClient) {
+    try { await pgliteClient.close() } catch {}
+    pgliteClient = null
+  }
+  db = null
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
