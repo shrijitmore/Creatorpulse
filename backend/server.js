@@ -18,6 +18,7 @@ import memoryRouter from './routes/memory.js'
 import sceneRouter from './routes/scene.js'
 import recordingRouter from './routes/recording.js'
 import billingRouter from './routes/billing.js'
+import nichesRouter from './routes/niches.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -177,6 +178,7 @@ app.use('/api/memory', memoryRouter)
 app.use('/api/scene', sceneRouter)
 app.use('/api/recording', recordingRouter)
 app.use('/api/billing', billingRouter)
+app.use('/api/niches', nichesRouter)
 
 // Trends routes
 app.use('/api/trends', trendsRouter)

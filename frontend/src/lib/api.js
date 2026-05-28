@@ -234,3 +234,11 @@ export async function verifyBillingPayment({ orderId, paymentId, signature, plan
   })
   return data.data || data
 }
+
+export async function interpretNiche(query) {
+  const data = await apiFetch('/api/niches/interpret', {
+    method: 'POST',
+    body: JSON.stringify({ query })
+  })
+  return data.data || data
+}
