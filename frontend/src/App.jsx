@@ -4,7 +4,6 @@ import { useAuth, useUser } from '@clerk/clerk-react'
 import { ToastProvider, Logomark } from './components/ui.jsx'
 import { setTokenGetter } from './lib/apiClient.js'
 import Layout from './components/Layout.jsx'
-import { TrendsProvider } from './context/TrendsContext.jsx'
 import Landing from './pages/Landing.jsx'
 import Onboarding from './pages/Onboarding.jsx'
 import Dashboard from './pages/Dashboard.jsx'
@@ -161,7 +160,7 @@ function AppRoutes() {
         {isSignedIn && (
           <>
             <Route path="/onboarding" element={<Onboarding/>}/>
-            <Route element={<TrendsProvider><Layout/></TrendsProvider>}>
+            <Route element={<Layout/>}>
               <Route path="/dashboard" element={<Dashboard/>}/>
               <Route path="/studio"    element={<ScriptStudio/>}/>
               <Route path="/saved"     element={<SavedScripts/>}/>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation, Outlet } from 'react-router-dom'
 import { UserButton, useUser, useClerk } from '@clerk/clerk-react'
+import { TrendsProvider } from '../context/TrendsContext.jsx'
 import { COLORS } from '../constants/theme.js'
 import { useRecentScripts } from '../hooks/useRecentScripts.js'
 
@@ -261,15 +262,17 @@ export default function Layout() {
   }, [])
 
   return (
-    <div className="app-shell">
-      <Sidebar onCommand={() => setPaletteOpen(true)}/>
-      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: '100vh' }}>
-        <Topbar onCommand={() => setPaletteOpen(true)}/>
-        <main style={{ flex: 1, overflowY: 'auto' }}>
-          <Outlet/>
-        </main>
+    <TrendsProvider>
+      <div className="app-shell">
+        <Sidebar onCommand={() => setPaletteOpen(true)}/>
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: '100vh' }}>
+          <Topbar onCommand={() => setPaletteOpen(true)}/>
+          <main style={{ flex: 1, overflowY: 'auto' }}>
+            <Outlet/>
+          </main>
+        </div>
+        <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)}/>
       </div>
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)}/>
-    </div>
+    </TrendsProvider>
   )
 }
