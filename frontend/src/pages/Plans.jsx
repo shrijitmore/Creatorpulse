@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PLANS } from '../constants/plans.js'
+import { getProfile } from '../lib/api.js'
 import PricingCard from '../features/billing/PricingCard.jsx'
 import CompareTable from '../features/billing/CompareTable.jsx'
 import PlanFAQ from '../features/billing/PlanFAQ.jsx'
@@ -15,8 +16,20 @@ const TRUST = [
 export default function Plans() {
   const navigate = useNavigate()
   const [yearly, setYearly] = useState(false)
+  const [currentPlan, setCurrentPlan] = useState('free')
+  const [scriptsUsed, setScriptsUsed] = useState(0)
+  const [scriptsLimit, setScriptsLimit] = useState(5)
 
-  const currentPlan = 'free'
+  useEffect(() => {
+    getProfile()
+      .then(d => {
+        if (d?.plan) setCurrentPlan(d.plan)
+        if (d?.stats?.totalScripts != null) setScriptsUsed(d.stats.totalScripts)
+        const limit = PLANS.find(p => p.id === (d?.plan || 'free'))?.limits?.scripts
+        if (limit && isFinite(limit)) setScriptsLimit(limit)
+      })
+      .catch(() => {})
+  }, [])
 
   const handleSelect = (plan) => {
     if (plan.id === 'free') return
@@ -58,7 +71,7 @@ export default function Plans() {
 
         {/* Current plan */}
         <div style={{ marginBottom: 32 }}>
-          <CurrentPlanCard plan={currentPlan} scriptsUsed={3} scriptsLimit={5}/>
+          <CurrentPlanCard plan={currentPlan} scriptsUsed={scriptsUsed} scriptsLimit={scriptsLimit}/>
         </div>
 
         {/* Billing cycle toggle */}
@@ -90,7 +103,7 @@ export default function Plans() {
         </div>
 
         {/* Pricing cards */}
-        <div style={{ display: 'flex', gap: 16, alignItems: 'stretch', marginBottom: 64 }}>
+        <div className="billing-cards">
           {cards}
         </div>
 

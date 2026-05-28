@@ -545,8 +545,8 @@ export default function Onboarding() {
           rawVoiceSample: answers.voice !== '(skipped)' ? answers.voice || '' : '',
         })
       ])
-    } catch (err) {
-      console.warn('[onboarding] Backend save failed (continuing):', err.message)
+    } catch {
+      // backend save failure is non-fatal — user continues to dashboard
     }
 
     navigate('/dashboard', { replace: true })

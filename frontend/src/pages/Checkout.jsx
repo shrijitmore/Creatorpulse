@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '@clerk/clerk-react'
 import { Icon } from '../components/ui.jsx'
 import { PLANS } from '../constants/plans.js'
+import { COLORS } from '../constants/theme.js'
 import { createBillingOrder, verifyBillingPayment } from '../lib/api.js'
 
 function loadRazorpay() {
@@ -107,6 +108,29 @@ export default function Checkout() {
 
   if (!plan) return null
 
+  const cycleButtons = ['monthly', 'yearly'].map(c => (
+    <button
+      key={c}
+      onClick={() => setCycle(c)}
+      style={{
+        flex: 1, padding: '8px 0', border: 'none', borderRadius: 8, cursor: 'pointer',
+        background: cycle === c ? 'var(--paper)' : 'transparent',
+        color: cycle === c ? 'var(--ink)' : 'var(--mute)',
+        fontSize: 13, fontWeight: cycle === c ? 500 : 400,
+        boxShadow: cycle === c ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
+        transition: 'all 0.15s',
+      }}>
+      {c === 'monthly' ? 'Monthly' : 'Yearly · save 20%'}
+    </button>
+  ))
+
+  const featureItems = plan.features.map(f => (
+    <li key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--ink-2)' }}>
+      <Icon.Check size={12} stroke={2.5} style={{ color: 'var(--ink)', flexShrink: 0 }}/>
+      {f}
+    </li>
+  ))
+
   return (
     <div className="app-main">
       <div className="app-top" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -123,7 +147,7 @@ export default function Checkout() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 760, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, padding: '8px 0 60px' }}>
+      <div className="billing-checkout">
 
         {/* Order summary */}
         <div>
@@ -149,33 +173,14 @@ export default function Checkout() {
 
               {/* Billing cycle toggle */}
               <div style={{ background: 'var(--paper-2)', border: '1px solid var(--line)', borderRadius: 10, padding: 4, display: 'flex', marginBottom: 20 }}>
-                {['monthly', 'yearly'].map(c => (
-                  <button
-                    key={c}
-                    onClick={() => setCycle(c)}
-                    style={{
-                      flex: 1, padding: '8px 0', border: 'none', borderRadius: 8, cursor: 'pointer',
-                      background: cycle === c ? 'var(--paper)' : 'transparent',
-                      color: cycle === c ? 'var(--ink)' : 'var(--mute)',
-                      fontSize: 13, fontWeight: cycle === c ? 500 : 400,
-                      boxShadow: cycle === c ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
-                      transition: 'all 0.15s',
-                    }}>
-                    {c === 'monthly' ? 'Monthly' : 'Yearly · save 20%'}
-                  </button>
-                ))}
+                {cycleButtons}
               </div>
 
               {/* Features included */}
               <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16 }}>
                 <p style={{ fontSize: 11, fontFamily: 'var(--mono)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--mute)', marginBottom: 10 }}>Included</p>
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {plan.features.map(f => (
-                    <li key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--ink-2)' }}>
-                      <Icon.Check size={12} stroke={2.5} style={{ color: 'var(--ink)', flexShrink: 0 }}/>
-                      {f}
-                    </li>
-                  ))}
+                  {featureItems}
                 </ul>
               </div>
 
@@ -187,8 +192,8 @@ export default function Checkout() {
                 </div>
                 {couponApplied && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <span style={{ fontSize: 13, color: '#16A34A' }}>Coupon (LAUNCH20)</span>
-                    <span style={{ fontSize: 13, color: '#16A34A' }}>−₹{(totalPrice - discountedTotal).toLocaleString('en-IN')}</span>
+                    <span style={{ fontSize: 13, color: COLORS.success }}>Coupon (LAUNCH20)</span>
+                    <span style={{ fontSize: 13, color: COLORS.success }}>−₹{(totalPrice - discountedTotal).toLocaleString('en-IN')}</span>
                   </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--line)' }}>
@@ -228,12 +233,12 @@ export default function Checkout() {
                     {couponApplied ? '✓' : 'Apply'}
                   </button>
                 </div>
-                {couponApplied && <p style={{ fontSize: 12, color: '#16A34A', marginTop: 6 }}>Coupon applied — 20% off</p>}
+                {couponApplied && <p style={{ fontSize: 12, color: COLORS.success, marginTop: 6 }}>Coupon applied — 20% off</p>}
               </div>
 
               {error && (
-                <div style={{ padding: '10px 14px', borderRadius: 10, background: '#FEF2F2', border: '1px solid #FECACA' }}>
-                  <p style={{ fontSize: 12.5, color: '#DC2626' }}>{error}</p>
+                <div style={{ padding: '10px 14px', borderRadius: 10, background: COLORS.errorsoft, border: `1px solid ${COLORS.error}40` }}>
+                  <p style={{ fontSize: 12.5, color: COLORS.error }}>{error}</p>
                 </div>
               )}
 

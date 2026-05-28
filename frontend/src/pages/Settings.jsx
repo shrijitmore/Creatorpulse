@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { NICHES } from '../lib/mockData.js'
+import { NICHES } from '../constants/niches.js'
+import { COLORS } from '../constants/theme.js'
 import { CONTENT_FORMATS, LANGUAGE_STYLES } from '../constants/platforms.js'
 import { updateNiches, updateSettings, refreshTrends, getProfile, updateProfile } from '../lib/api.js'
 
@@ -245,7 +246,7 @@ export default function Settings() {
                 )
               })}
             </div>
-            {nicheError && <p style={{ fontSize: 12, color: 'rgb(192,74,46)', marginTop: 10 }}>{nicheError}</p>}
+            {nicheError && <p style={{ fontSize: 12, color: COLORS.error, marginTop: 10 }}>{nicheError}</p>}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--line)' }}>
               <span className="small">{selectedNiches.length} niche{selectedNiches.length !== 1 ? 's' : ''} selected</span>
               <button

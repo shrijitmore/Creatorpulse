@@ -14,7 +14,7 @@ export default function PricingCard({ plan, isCurrent, yearly, onSelect }) {
         color: dark ? 'rgba(255,255,255,0.5)' : 'var(--ink)',
         marginTop: 2, flexShrink: 0,
       }}/>
-      <span style={{ fontSize: 13.5, color: dark ? 'rgba(255,255,255,0.8)' : 'var(--ink2)', lineHeight: 1.45 }}>{f}</span>
+      <span style={{ fontSize: 13.5, color: dark ? 'rgba(255,255,255,0.8)' : 'var(--ink-2)', lineHeight: 1.45 }}>{f}</span>
     </li>
   ))
 

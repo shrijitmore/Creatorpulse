@@ -69,6 +69,11 @@ export const COMPARE_ROWS = [
   { feature: 'Dedicated support',    free: false,           pro: false,          agency: true },
 ]
 
+export const USAGE_THRESHOLDS = {
+  danger:  80,
+  warning: 60,
+}
+
 export const PLAN_FAQS = [
   {
     q: 'Can I cancel anytime?',

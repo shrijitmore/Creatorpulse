@@ -51,8 +51,8 @@ export default function CompareTable() {
           Full feature breakdown
         </h2>
       </div>
-      <div style={{ border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div className="compare-scroll" style={{ border: '1px solid var(--line)' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 480 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--line)', background: 'var(--paper-2)' }}>
               <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: 11, fontFamily: 'var(--mono)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--mute)', fontWeight: 600, borderRight: '1px solid var(--line)' }}>Feature</th>

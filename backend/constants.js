@@ -4,6 +4,18 @@
 
 export const NICHES_DEFAULT = ['fitness', 'finance', 'tech', 'lifestyle', 'food', 'travel', 'beauty', 'gaming']
 
+// Billing — amounts in paise (INR × 100) for Razorpay
+export const PLAN_AMOUNTS = {
+  pro:    { monthly: 99900,   yearly: 958800  },
+  agency: { monthly: 499900,  yearly: 4799040 },
+}
+
+export const COUPON_DISCOUNTS = {
+  LAUNCH20: 0.20,
+}
+
+export const PLAN_IDS = ['free', 'pro', 'agency']
+
 export const SIGNAL_THRESHOLDS = { viral: 80, rising: 55 }
 
 export const CACHE_TTL = {

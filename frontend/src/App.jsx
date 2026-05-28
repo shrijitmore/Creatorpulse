@@ -129,13 +129,12 @@ function AppRoutes() {
     if (!isSignedIn) return
 
     const path = window.location.pathname
-    // Don't redirect on public pages
-    if (path === '/' || ['/sign-in', '/sign-up'].some(p => path.startsWith(p))) return
+    if (['/sign-in', '/sign-up'].some(p => path.startsWith(p))) return
 
-    if (!onboarded && path !== '/onboarding') {
-      navigate('/onboarding', { replace: true })
-    } else if (onboarded && path === '/onboarding') {
-      navigate('/dashboard', { replace: true })
+    if (!onboarded) {
+      if (path !== '/onboarding') navigate('/onboarding', { replace: true })
+    } else {
+      if (path === '/onboarding' || path === '/') navigate('/dashboard', { replace: true })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded, checking, isSignedIn, onboarded])

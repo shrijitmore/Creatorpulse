@@ -1,12 +1,14 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Icon } from '../../components/ui.jsx'
+import { COLORS } from '../../constants/theme.js'
+import { USAGE_THRESHOLDS } from '../../constants/plans.js'
 
 export default function CurrentPlanCard({ plan = 'free', scriptsUsed = 0, scriptsLimit = 5, resetDate = null }) {
   const navigate = useNavigate()
   const isFree = plan === 'free'
   const pct = isFree ? Math.min(100, Math.round((scriptsUsed / scriptsLimit) * 100)) : 0
-  const barColor = pct >= 80 ? '#DC2626' : pct >= 60 ? '#D97706' : 'var(--ink)'
+  const barColor = pct >= USAGE_THRESHOLDS.danger ? COLORS.error : pct >= USAGE_THRESHOLDS.warning ? COLORS.warn : 'var(--ink)'
 
   return (
     <div style={{

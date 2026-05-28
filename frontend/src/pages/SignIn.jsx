@@ -47,8 +47,9 @@ export default function SignInPage() {
                   fontSize: '14px',
                 },
                 elements: {
-                  rootBox: 'w-full',
-                  card: { boxShadow: 'none', border: 'none', padding: 0, overflow: 'visible' },
+                  rootBox: { width: '100%' },
+                  card: { boxShadow: 'none', border: 'none', padding: 0, overflow: 'visible', background: 'transparent' },
+                  cardBox: { boxShadow: 'none', border: 'none' },
                   headerTitle: { display: 'none' },
                   headerSubtitle: { display: 'none' },
                   formButtonPrimary: { background: 'var(--ink)', borderRadius: '999px', fontFamily: "'Geist', sans-serif", fontSize: '13.5px', fontWeight: 500 },

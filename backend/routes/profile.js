@@ -10,8 +10,13 @@ router.get('/', requireAuth, async (req, res) => {
   try {
     const db = await getDb()
 
-    const [profile, stats, favFormatRes, topTopics, topHooks, scriptHistory] = await Promise.all([
+    const [profile, planRes, stats, favFormatRes, topTopics, topHooks, scriptHistory] = await Promise.all([
       getCreatorProfile(req.userId),
+
+      db.query(
+        `SELECT plan, plan_cycle, plan_expires_at FROM users WHERE id = $1`,
+        [req.userId]
+      ).catch(() => ({ rows: [{}] })),
 
       db.query(
         `SELECT
@@ -53,9 +58,14 @@ router.get('/', requireAuth, async (req, res) => {
 
     const s = stats.rows[0] || {}
 
+    const planRow = planRes.rows[0] || {}
+
     res.json({
       success: true,
       data: {
+        plan: planRow.plan || 'free',
+        planCycle: planRow.plan_cycle || 'monthly',
+        planExpiresAt: planRow.plan_expires_at || null,
         profile: profile ? {
           creatorName: profile.creator_name,
           platforms: profile.platforms || [],

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation, Outlet } from 'react-router-dom'
 import { UserButton, useUser, useClerk } from '@clerk/clerk-react'
-import { getSavedScripts } from '../lib/api.js'
+import { COLORS } from '../constants/theme.js'
+import { useRecentScripts } from '../hooks/useRecentScripts.js'
 
 const NAV = [
   { to: '/dashboard', label: 'Dashboard',      icon: '◈', shortcut: 'G D' },
@@ -119,19 +120,10 @@ function Sidebar({ onCommand }) {
   const location = useLocation()
   const { user } = useUser()
   const { signOut } = useClerk()
-  const [recentScripts, setRecentScripts] = useState([])
-
   const name = user?.fullName || user?.firstName || 'Creator'
   const email = user?.primaryEmailAddress?.emailAddress || ''
 
-  useEffect(() => {
-    getSavedScripts()
-      .then(scripts => {
-        const list = Array.isArray(scripts) ? scripts : scripts?.data || []
-        setRecentScripts(list.slice(0, 3))
-      })
-      .catch(() => {})
-  }, [])
+  const recentScripts = useRecentScripts(3)
 
   return (
     <aside className="side">
@@ -166,17 +158,17 @@ function Sidebar({ onCommand }) {
 
         {recentScripts.length > 0 && (
           <div style={{ marginTop: 14 }}>
-            <p style={{ padding: '0 10px', marginBottom: 2, fontFamily: 'var(--mono)', fontSize: 9.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: '#A8A8A8' }}>Recent</p>
-            {recentScripts.slice(0, 3).map(s => (
+            <p style={{ padding: '0 10px', marginBottom: 2, fontFamily: 'var(--mono)', fontSize: 9.5, letterSpacing: '0.13em', textTransform: 'uppercase', color: 'var(--mute-2)' }}>Recent</p>
+            {recentScripts.map(s => (
               <button
                 key={s.id}
                 title={s.topicTitle}
                 onClick={() => navigate(`/studio?topicId=${s.topicId || s.id}&title=${encodeURIComponent(s.topicTitle)}&niche=${encodeURIComponent(s.niche || '')}`)}
-                onMouseEnter={e => { e.currentTarget.style.background = '#FAFAFA'; e.currentTarget.style.color = '#0A0A0A' }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#767676' }}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 10px', borderRadius: 7, background: 'transparent', border: 'none', cursor: 'pointer', color: '#767676', fontFamily: 'var(--sans)', fontSize: 12.5, textAlign: 'left', transition: 'background 0.18s, color 0.18s', overflow: 'hidden' }}>
+                onMouseEnter={e => { e.currentTarget.style.background = 'var(--paper-2)'; e.currentTarget.style.color = 'var(--ink)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--mute)' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 10px', borderRadius: 7, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--mute)', fontFamily: 'var(--sans)', fontSize: 12.5, textAlign: 'left', transition: 'background 0.18s, color 0.18s', overflow: 'hidden' }}>
                 <span style={{ width: 16, display: 'flex', justifyContent: 'center', alignItems: 'center', flexShrink: 0 }}>
-                  <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#D4D4D4', display: 'block', flexShrink: 0 }}/>
+                  <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--line)', display: 'block', flexShrink: 0 }}/>
                 </span>
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{s.topicTitle}</span>
               </button>
@@ -213,7 +205,7 @@ function Sidebar({ onCommand }) {
         <button
           onClick={() => signOut({ redirectUrl: '/sign-in' })}
           style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, fontSize: 13, color: 'var(--mute)', transition: 'all var(--tx-fast)', width: '100%' }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(192,74,46,0.08)'; e.currentTarget.style.color = 'rgb(192,74,46)' }}
+          onMouseEnter={e => { e.currentTarget.style.background = `${COLORS.error}14`; e.currentTarget.style.color = COLORS.error }}
           onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = 'var(--mute)' }}>
           <span>↩</span>
           <span className="side-label">Sign out</span>
