@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/clerk-react'
-import { useTrends } from '../hooks/useTrends.js'
+import { useTrendsContext } from '../context/TrendsContext.jsx'
 import { getProfile } from '../lib/api.js'
 import { NICHES } from '../lib/mockData.js'
 
@@ -230,12 +230,7 @@ function LoadingPhase({ selectedNiches }) {
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const storedNiches = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem('trendforge_niches') || '[]') } catch { return [] }
-  }, [])
-
-  const [phase, setPhase] = useState('idle')
-  const [selectedNiches, setSelectedNiches] = useState(storedNiches.length > 0 ? storedNiches : NICHES.map(n => n.id))
+  const { phase, selectedNiches, allTrends, lastUpdated, refreshing, fetchNow, refresh, toggleNiche } = useTrendsContext()
   const [platform, setPlatform] = useState('all')
   const [signal, setSignal] = useState('all')
   const [apiProfile, setApiProfile] = useState(null)
@@ -247,25 +242,8 @@ export default function Dashboard() {
       .catch(() => {})
   }, [])
 
-  const { allTrends, loading, refreshing, lastUpdated, fetchNow, refresh } = useTrends(selectedNiches, { lazy: true })
-
-  useEffect(() => {
-    if (phase === 'loading' && !loading && allTrends.length >= 0 && lastUpdated) setPhase('ready')
-  }, [phase, loading, lastUpdated])
-
-  const handleFetch = useCallback(() => {
-    setPhase('loading')
-    fetchNow(selectedNiches).catch(() => setPhase('idle'))
-  }, [selectedNiches, fetchNow])
-
-  const handleToggleNiche = useCallback((id) => {
-    setSelectedNiches(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
-  }, [])
-
-  const handleRefresh = useCallback(() => {
-    setPhase('loading')
-    refresh(selectedNiches).catch(() => setPhase('ready'))
-  }, [selectedNiches, refresh])
+  const handleFetch = useCallback(() => fetchNow(selectedNiches), [selectedNiches, fetchNow])
+  const handleRefresh = useCallback(() => refresh(selectedNiches), [selectedNiches, refresh])
 
   const filtered = useMemo(() => {
     let list = [...allTrends]
@@ -298,7 +276,7 @@ export default function Dashboard() {
     return (
       <div className="app-main">
         <div style={{ marginBottom: 20 }}><CreatorBrief apiProfile={apiProfile} stats={profileStats}/></div>
-        <IdlePhase selectedNiches={selectedNiches} onToggleNiche={handleToggleNiche} onFetch={handleFetch}/>
+        <IdlePhase selectedNiches={selectedNiches} onToggleNiche={toggleNiche} onFetch={handleFetch}/>
       </div>
     )
   }
@@ -358,7 +336,7 @@ export default function Dashboard() {
               key={n.id}
               className={`chip ${selectedNiches.includes(n.id) ? 'active' : ''}`}
               style={{ cursor: 'pointer' }}
-              onClick={() => handleToggleNiche(n.id)}>
+              onClick={() => toggleNiche(n.id)}>
               {n.icon} {n.label}
             </button>
           ))}
