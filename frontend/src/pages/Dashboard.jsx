@@ -239,22 +239,22 @@ export default function Dashboard() {
 
   const nicheIds = useMemo(() => activeNiche ? [activeNiche.nicheId] : [], [activeNiche])
 
-  const { allTrends, loading, refreshing, lastUpdated, fetchNow, refresh } = useTrends(nicheIds, { lazy: true })
+  const { allTrends, refreshing, lastUpdated, fetchNow, refresh } = useTrends(nicheIds, { lazy: true })
 
-  useEffect(() => {
-    if (phase === 'loading' && !loading && lastUpdated) setPhase('ready')
-  }, [phase, loading, lastUpdated])
-
-  const handleNicheSelect = useCallback((niche) => {
+  const handleNicheSelect = useCallback(async (niche) => {
     setActiveNiche(niche)
     localStorage.setItem('trendforge_active_niche', JSON.stringify(niche))
     setPhase('loading')
-    fetchNow([niche.nicheId]).catch(() => setPhase('idle'))
+    try {
+      await fetchNow([niche.nicheId])
+      setPhase('ready')
+    } catch {
+      setPhase('idle')
+    }
   }, [fetchNow])
 
   const handleRefresh = useCallback(() => {
-    setPhase('loading')
-    refresh(nicheIds).catch(() => setPhase('ready'))
+    refresh(nicheIds).catch(() => {})
   }, [nicheIds, refresh])
 
   const handleChangeNiche = useCallback(() => {
@@ -392,9 +392,20 @@ export default function Dashboard() {
         </h2>
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="card" style={{ padding: '56px 16px', textAlign: 'center' }}>
-          <p style={{ fontSize: 16, fontWeight: 500, color: 'var(--ink)', marginBottom: 6 }}>Nothing matches those filters</p>
+      {allTrends.length === 0 ? (
+        <div className="card" style={{ padding: '52px 24px', textAlign: 'center' }}>
+          <p style={{ fontSize: 24, marginBottom: 12 }}>📡</p>
+          <p style={{ fontSize: 15, fontWeight: 500, color: 'var(--ink)', marginBottom: 6 }}>No signals found for {nicheLabel}</p>
+          <p className="body" style={{ marginBottom: 20, maxWidth: 380, margin: '0 auto 20px' }}>
+            Scrapers may still be warming up, or API credentials need setup. Try refreshing.
+          </p>
+          <button className="btn btn-primary btn-sm" onClick={handleRefresh} disabled={refreshing}>
+            {refreshing ? <><span className="tdot"/><span className="tdot"/><span className="tdot"/></> : '↻ Try again'}
+          </button>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="card" style={{ padding: '52px 16px', textAlign: 'center' }}>
+          <p style={{ fontSize: 15, fontWeight: 500, color: 'var(--ink)', marginBottom: 6 }}>Nothing matches those filters</p>
           <p className="body">Try a different platform or signal filter.</p>
         </div>
       ) : (
