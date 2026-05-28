@@ -278,6 +278,7 @@ button { cursor: pointer; }
 .auth-side.reverse { order: 2; }
 .auth-main { padding: 48px; display: flex; align-items: center; justify-content: center; overflow: visible; }
 .cl-rootBox, .cl-card, .cl-cardBox, .cl-main { overflow: visible !important; }
+.cl-card { padding: 32px !important; }
 .auth-side.reverse + .auth-main { order: 1; }
 .auth-quote { max-width: 440px; position: relative; }
 .auth-quote p { font-size: clamp(22px, 2.4vw, 30px); font-weight: 500; letter-spacing: -0.025em; line-height: 1.2; color: var(--paper); }
