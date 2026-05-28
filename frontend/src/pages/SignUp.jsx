@@ -7,7 +7,7 @@ export default function SignUpPage() {
       <div className="auth-grid">
         {/* Left — form */}
         <div className="auth-main" style={{ order: 1 }}>
-          <div style={{ width: '100%', maxWidth: 400 }}>
+          <div style={{ width: '100%', maxWidth: 500, overflow: 'visible' }}>
             <div style={{ marginBottom: 32 }}>
               <a className="brand" href="/" style={{ marginBottom: 32, display: 'inline-flex' }}><span className="mark"/>Creatorpulse</a>
               <span className="kicker" style={{ display: 'block', marginTop: 24 }}>Get started free</span>
@@ -27,8 +27,9 @@ export default function SignUpPage() {
                   fontSize: '14px',
                 },
                 elements: {
-                  rootBox: 'w-full',
-                  card: { boxShadow: 'none', border: 'none', padding: 0 },
+                  rootBox: { width: '100%' },
+                  card: { boxShadow: 'none', border: 'none', padding: 0, overflow: 'visible', background: 'transparent' },
+                  cardBox: { boxShadow: 'none', border: 'none' },
                   headerTitle: { display: 'none' },
                   headerSubtitle: { display: 'none' },
                   formButtonPrimary: { background: 'var(--ink)', borderRadius: '999px', fontFamily: "'Geist', sans-serif", fontSize: '13.5px', fontWeight: 500 },

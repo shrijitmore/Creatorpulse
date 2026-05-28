@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/clerk-react'
-import { useTrends } from '../hooks/useTrends.js'
+import { useTrends } from '../features/dashboard/hooks/useTrends.js'
 import { getProfile } from '../lib/api.js'
-import { NICHES } from '../lib/mockData.js'
+import { getNiche } from '../constants/niches.js'
+import NichePicker from '../features/dashboard/components/NichePicker.jsx'
 
 const PLATFORM_OPTS = [
   { id: 'all', label: 'All' }, { id: 'instagram', label: 'Instagram' },
@@ -14,17 +15,18 @@ const SIGNAL_OPTS = [
   { id: 'rising', label: 'Rising' }, { id: 'new', label: 'New' },
 ]
 const FETCH_STEPS = [
-  { id: 'reddit',    label: 'Scanning Reddit',        duration: 8000  },
-  { id: 'youtube',   label: 'Pulling YouTube trends', duration: 10000 },
-  { id: 'instagram', label: 'Reading Instagram',      duration: 10000 },
-  { id: 'ai',        label: 'AI ranking signals',     duration: 99999 },
+  { id: 'reddit',    label: 'Scanning Reddit',         duration: 8000  },
+  { id: 'youtube',   label: 'Pulling YouTube trends',  duration: 10000 },
+  { id: 'instagram', label: 'Reading Instagram',       duration: 10000 },
+  { id: 'ai',        label: 'AI ranking signals',      duration: 99999 },
 ]
+const SIGNAL_COLORS = { viral: '#E23B3B', rising: 'var(--pulse)', new: '#8B6FDE' }
 
 function signalColor(signal) {
-  if (signal === 'viral')  return '#E23B3B'
-  if (signal === 'rising') return 'var(--pulse)'
-  return '#8B6FDE'
+  return SIGNAL_COLORS[signal] || SIGNAL_COLORS.new
 }
+
+// ─── Sparkline ────────────────────────────────────────────────────────────────
 
 function Sparkline({ signal, score }) {
   const pts = []
@@ -79,7 +81,7 @@ function TrendCard({ t, index = 0 }) {
 
 // ─── Summary tile ─────────────────────────────────────────────────────────────
 
-function SumCard({ label, value, sub, trend }) {
+function SumCard({ label, value, sub }) {
   return (
     <div className="sum-card">
       <div>
@@ -96,11 +98,26 @@ function SumCard({ label, value, sub, trend }) {
 function CreatorBrief({ apiProfile, stats }) {
   const navigate = useNavigate()
   const { user } = useUser()
-  const storedProfile = useMemo(() => { try { return JSON.parse(localStorage.getItem('trendforge_profile') || '{}') } catch { return {} } }, [])
+  const storedProfile = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('trendforge_profile') || '{}') } catch { return {} }
+  }, [])
   const name = user?.fullName || user?.firstName || apiProfile?.creatorName || storedProfile.name || 'Creator'
   const initials = name.split(' ').map(w => w[0]).slice(0, 2).join('')
   const voiceLabel = apiProfile?.contentStyles?.[0] || storedProfile.styles?.split(' + ')[0] || 'Storytelling'
   const goalLabel = apiProfile?.primaryGoal || storedProfile.goal || 'Grow audience'
+
+  const chips = [
+    { lbl: 'Voice', val: voiceLabel },
+    { lbl: 'Goal', val: goalLabel },
+    stats?.totalScripts != null && { lbl: 'Scripts', val: stats.totalScripts },
+  ].filter(Boolean)
+
+  const chipEls = chips.map(c => (
+    <span key={c.lbl} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px', border: '1px solid var(--line)', borderRadius: 999, fontSize: 12 }}>
+      <span className="small" style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10 }}>{c.lbl}</span>
+      <span style={{ fontWeight: 500, color: 'var(--ink)' }}>{c.val}</span>
+    </span>
+  ))
 
   return (
     <div className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
@@ -108,16 +125,7 @@ function CreatorBrief({ apiProfile, stats }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--ink)' }}>{name}</span>
-          {[
-            { lbl: 'Voice', val: voiceLabel },
-            { lbl: 'Goal', val: goalLabel },
-            stats?.totalScripts != null && { lbl: 'Scripts', val: stats.totalScripts },
-          ].filter(Boolean).map(c => (
-            <span key={c.lbl} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px', border: '1px solid var(--line)', borderRadius: 999, fontSize: 12 }}>
-              <span className="small" style={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 10 }}>{c.lbl}</span>
-              <span style={{ fontWeight: 500, color: 'var(--ink)' }}>{c.val}</span>
-            </span>
-          ))}
+          {chipEls}
         </div>
       </div>
       <button className="btn btn-ghost btn-sm" onClick={() => navigate('/profile')} style={{ flexShrink: 0 }}>Edit profile</button>
@@ -127,46 +135,27 @@ function CreatorBrief({ apiProfile, stats }) {
 
 // ─── Idle phase ───────────────────────────────────────────────────────────────
 
-function IdlePhase({ selectedNiches, onToggleNiche, onFetch }) {
+function IdlePhase({ onSelect }) {
   const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
   return (
-    <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 16px' }}>
-      <span className="kicker" style={{ justifyContent: 'center', marginBottom: 12 }}>{todayStr}</span>
-      <h1 style={{ fontSize: 28, fontWeight: 500, letterSpacing: '-0.02em', color: 'var(--ink)', textAlign: 'center', marginBottom: 8 }}>
-        What's moving today?
-      </h1>
-      <p className="body" style={{ textAlign: 'center', maxWidth: 440, marginBottom: 40 }}>
-        Pick your niches and we'll scan Reddit, YouTube, and Instagram for the best signals, summarised and ranked just for you.
-      </p>
-      <div className="card" style={{ width: '100%', maxWidth: 580 }}>
-        <span className="label" style={{ marginBottom: 12 }}>Select niches</span>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
-          {NICHES.map(n => (
-            <button
-              key={n.id}
-              className={`chip ${selectedNiches.includes(n.id) ? 'active' : ''}`}
-              style={{ cursor: 'pointer' }}
-              onClick={() => onToggleNiche(n.id)}>
-              {n.icon} {n.label}
-            </button>
-          ))}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 16, borderTop: '1px solid var(--line)' }}>
-          <span className="small">
-            {selectedNiches.length === 0 ? 'Select at least one niche' : `${selectedNiches.length} niche${selectedNiches.length > 1 ? 's' : ''} · ~30 sec fetch`}
-          </span>
-          <button className="btn btn-primary" disabled={selectedNiches.length === 0} onClick={onFetch}>
-            Get my feed →
-          </button>
-        </div>
+    <div className="fade-up" style={{ width: '100%' }}>
+      <div style={{ textAlign: 'center', padding: '40px 16px 36px' }}>
+        <span className="kicker" style={{ justifyContent: 'center', marginBottom: 10 }}>{todayStr}</span>
+        <h1 style={{ fontSize: 30, fontWeight: 500, letterSpacing: '-0.025em', color: 'var(--ink)', marginBottom: 10 }}>
+          What's your niche?
+        </h1>
+        <p className="body" style={{ maxWidth: 440, margin: '0 auto' }}>
+          Pick from 70+ presets or describe your own — AI will find the right signals for you.
+        </p>
       </div>
+      <NichePicker onSelect={onSelect}/>
     </div>
   )
 }
 
 // ─── Loading phase ────────────────────────────────────────────────────────────
 
-function LoadingPhase({ selectedNiches }) {
+function LoadingPhase({ nicheLabel }) {
   const [stepIdx, setStepIdx] = useState(0)
   const [progress, setProgress] = useState(0)
   const rafRef = useRef(null)
@@ -192,34 +181,35 @@ function LoadingPhase({ selectedNiches }) {
     return () => { clearTimeout(timer); cancelAnimationFrame(rafRef.current) }
   }, [])
 
-  const nicheLabels = selectedNiches.map(id => NICHES.find(n => n.id === id)?.label).filter(Boolean)
+  const stepItems = FETCH_STEPS.map((step, i) => {
+    const done = i < stepIdx
+    const current = i === stepIdx
+    return (
+      <div key={step.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          {done
+            ? <span style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--ink)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>✓</span>
+            : current
+            ? <span style={{ display: 'flex', gap: 2 }}><span className="tdot"/><span className="tdot"/><span className="tdot"/></span>
+            : <span style={{ width: 20, height: 20, borderRadius: '50%', border: '1px solid var(--line)', background: 'var(--paper-3)' }}/>}
+        </div>
+        <span style={{ fontSize: 13.5, fontWeight: done || current ? 500 : 400, color: done ? 'var(--mute)' : current ? 'var(--ink)' : 'var(--mute-2)', textDecoration: done ? 'line-through' : 'none' }}>{step.label}</span>
+        {done && <span className="small mono" style={{ marginLeft: 'auto' }}>done</span>}
+      </div>
+    )
+  })
 
   return (
     <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 16px' }}>
       <div className="card" style={{ width: '100%', maxWidth: 520, padding: 32 }}>
         <span className="label" style={{ marginBottom: 6 }}>Fetching live signals</span>
         <h2 style={{ fontSize: 20, fontWeight: 500, letterSpacing: '-0.01em', color: 'var(--ink)', marginBottom: 4 }}>Finding your best content…</h2>
-        <p className="small" style={{ marginBottom: 20 }}>{nicheLabels.join(' · ')}</p>
+        <p className="small" style={{ marginBottom: 20 }}>{nicheLabel}</p>
         <div style={{ height: 4, borderRadius: 999, background: 'var(--paper-3)', overflow: 'hidden', marginBottom: 24 }}>
           <div style={{ height: '100%', borderRadius: 999, background: 'var(--ink)', transition: 'width .5s ease-out', width: `${progress}%` }}/>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {FETCH_STEPS.map((step, i) => {
-            const done = i < stepIdx; const current = i === stepIdx
-            return (
-              <div key={step.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  {done
-                    ? <span style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--ink)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>✓</span>
-                    : current
-                    ? <span style={{ display: 'flex', gap: 2 }}><span className="tdot"/><span className="tdot"/><span className="tdot"/></span>
-                    : <span style={{ width: 20, height: 20, borderRadius: '50%', border: '1px solid var(--line)', background: 'var(--paper-3)' }}/>}
-                </div>
-                <span style={{ fontSize: 13.5, fontWeight: done || current ? 500 : 400, color: done ? 'var(--mute)' : current ? 'var(--ink)' : 'var(--mute-2)', textDecoration: done ? 'line-through' : 'none' }}>{step.label}</span>
-                {done && <span className="small mono" style={{ marginLeft: 'auto' }}>done</span>}
-              </div>
-            )
-          })}
+          {stepItems}
         </div>
         <p className="small" style={{ textAlign: 'center', marginTop: 24 }}>Scanning across communities. About 30–40 seconds.</p>
       </div>
@@ -230,12 +220,12 @@ function LoadingPhase({ selectedNiches }) {
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const storedNiches = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem('trendforge_niches') || '[]') } catch { return [] }
+  const storedNicheRaw = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('trendforge_active_niche') || 'null') } catch { return null }
   }, [])
 
   const [phase, setPhase] = useState('idle')
-  const [selectedNiches, setSelectedNiches] = useState(storedNiches.length > 0 ? storedNiches : NICHES.map(n => n.id))
+  const [activeNiche, setActiveNiche] = useState(storedNicheRaw)
   const [platform, setPlatform] = useState('all')
   const [signal, setSignal] = useState('all')
   const [apiProfile, setApiProfile] = useState(null)
@@ -247,38 +237,42 @@ export default function Dashboard() {
       .catch(() => {})
   }, [])
 
-  const { allTrends, loading, refreshing, lastUpdated, fetchNow, refresh } = useTrends(selectedNiches, { lazy: true })
+  const nicheIds = useMemo(() => activeNiche ? [activeNiche.nicheId] : [], [activeNiche])
 
-  useEffect(() => {
-    if (phase === 'loading' && !loading && allTrends.length >= 0 && lastUpdated) setPhase('ready')
-  }, [phase, loading, lastUpdated])
+  const { allTrends, refreshing, lastUpdated, fetchNow, refresh } = useTrends(nicheIds, { lazy: true })
 
-  const handleFetch = useCallback(() => {
+  const handleNicheSelect = useCallback(async (niche) => {
+    setActiveNiche(niche)
+    localStorage.setItem('trendforge_active_niche', JSON.stringify(niche))
     setPhase('loading')
-    fetchNow(selectedNiches).catch(() => setPhase('idle'))
-  }, [selectedNiches, fetchNow])
-
-  const handleToggleNiche = useCallback((id) => {
-    setSelectedNiches(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
-  }, [])
+    try {
+      await fetchNow([niche.nicheId])
+      setPhase('ready')
+    } catch {
+      setPhase('idle')
+    }
+  }, [fetchNow])
 
   const handleRefresh = useCallback(() => {
-    setPhase('loading')
-    refresh(selectedNiches).catch(() => setPhase('ready'))
-  }, [selectedNiches, refresh])
+    refresh(nicheIds).catch(() => {})
+  }, [nicheIds, refresh])
+
+  const handleChangeNiche = useCallback(() => {
+    setPhase('idle')
+    setActiveNiche(null)
+    localStorage.removeItem('trendforge_active_niche')
+  }, [])
 
   const filtered = useMemo(() => {
     let list = [...allTrends]
-    if (selectedNiches.length > 0) list = list.filter(t => selectedNiches.includes(t.niche))
     if (platform !== 'all') list = list.filter(t => t.platform === platform)
     if (signal !== 'all') list = list.filter(t => t.signal === signal)
     return list
-  }, [allTrends, selectedNiches, platform, signal])
+  }, [allTrends, platform, signal])
 
-  const recommendations = useMemo(() => {
+  const topPicks = useMemo(() => {
     const byPlatform = {}
     for (const t of allTrends) {
-      if (!selectedNiches.includes(t.niche)) continue
       if (!byPlatform[t.platform]) byPlatform[t.platform] = []
       byPlatform[t.platform].push(t)
     }
@@ -287,18 +281,18 @@ export default function Dashboard() {
     for (const p of ['instagram', 'youtube', 'reddit']) {
       if (byPlatform[p]) picks.push(...byPlatform[p].slice(0, 2))
     }
-    if (picks.length < 4) {
-      const seen = new Set(picks.map(p => p.id))
-      picks.push(...allTrends.filter(t => !seen.has(t.id)).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 6 - picks.length))
-    }
     return picks.slice(0, 6)
-  }, [allTrends, selectedNiches])
+  }, [allTrends])
+
+  const nichePreset = activeNiche ? getNiche(activeNiche.nicheId) : null
+  const nicheLabel = activeNiche?.nicheLabel || nichePreset?.label || activeNiche?.nicheId || ''
+  const nicheIcon  = nichePreset?.icon || ''
 
   if (phase === 'idle') {
     return (
       <div className="app-main">
         <div style={{ marginBottom: 20 }}><CreatorBrief apiProfile={apiProfile} stats={profileStats}/></div>
-        <IdlePhase selectedNiches={selectedNiches} onToggleNiche={handleToggleNiche} onFetch={handleFetch}/>
+        <IdlePhase onSelect={handleNicheSelect}/>
       </div>
     )
   }
@@ -306,7 +300,7 @@ export default function Dashboard() {
   if (phase === 'loading') {
     return (
       <div className="app-main">
-        <LoadingPhase selectedNiches={selectedNiches}/>
+        <LoadingPhase nicheLabel={nicheLabel}/>
       </div>
     )
   }
@@ -314,15 +308,26 @@ export default function Dashboard() {
   // ── Ready ──────────────────────────────────────────────────────────────────
   const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
+  const platformOptions = PLATFORM_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)
+  const signalOptions   = SIGNAL_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)
+  const trendCards      = filtered.map((t, i) => <TrendCard key={t.id} t={t} index={i}/>)
+  const topPickCards    = topPicks.slice(0, 3).map((t, i) => <TrendCard key={`rec-${t.id}`} t={t} index={i}/>)
+
   return (
     <div className="app-main">
       {/* Header */}
       <div className="app-top">
         <div>
-          <span className="kicker">{todayStr} · {selectedNiches.length * 2} communities</span>
-          <h1 style={{ fontSize: 24, fontWeight: 500, letterSpacing: '-0.02em', color: 'var(--ink)', marginTop: 6 }}>What's moving today</h1>
+          <span className="kicker">{todayStr}</span>
+          <h1 style={{ fontSize: 24, fontWeight: 500, letterSpacing: '-0.02em', color: 'var(--ink)', marginTop: 6 }}>
+            {nicheIcon && <span style={{ marginRight: 8 }}>{nicheIcon}</span>}
+            {nicheLabel}
+          </h1>
         </div>
         <div className="row" style={{ gap: 10 }}>
+          <button className="btn btn-ghost btn-sm" onClick={handleChangeNiche}>
+            ← Change niche
+          </button>
           <button
             className="btn btn-line btn-sm"
             onClick={handleRefresh}
@@ -346,52 +351,35 @@ export default function Dashboard() {
         <SumCard label="Total signals" value={allTrends.length} sub="Across all platforms"/>
         <SumCard label="Viral" value={allTrends.filter(t => t.signal === 'viral').length} sub="Breaking now"/>
         <SumCard label="Rising" value={allTrends.filter(t => t.signal === 'rising').length} sub="Gaining momentum"/>
-        <SumCard label="Niches watched" value={selectedNiches.length} sub="Active communities"/>
+        <SumCard label="Avg score" value={allTrends.length ? Math.round(allTrends.reduce((s, t) => s + (t.score || 0), 0) / allTrends.length) : '—'} sub="Signal strength"/>
       </div>
 
       {/* Filters */}
       <div className="app-filters">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-          <span className="label" style={{ marginBottom: 0, marginRight: 4 }}>Niches</span>
-          {NICHES.map(n => (
-            <button
-              key={n.id}
-              className={`chip ${selectedNiches.includes(n.id) ? 'active' : ''}`}
-              style={{ cursor: 'pointer' }}
-              onClick={() => handleToggleNiche(n.id)}>
-              {n.icon} {n.label}
-            </button>
-          ))}
-        </div>
-        <div className="row" style={{ gap: 10 }}>
-          <select
-            value={platform}
-            onChange={e => setPlatform(e.target.value)}
-            className="input"
-            style={{ height: 36, padding: '0 10px', width: 'auto' }}>
-            {PLATFORM_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span className="label" style={{ marginBottom: 0 }}>Platform</span>
+          <select value={platform} onChange={e => setPlatform(e.target.value)} className="input" style={{ height: 36, padding: '0 10px', width: 'auto' }}>
+            {platformOptions}
           </select>
-          <select
-            value={signal}
-            onChange={e => setSignal(e.target.value)}
-            className="input"
-            style={{ height: 36, padding: '0 10px', width: 'auto' }}>
-            {SIGNAL_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+          <span className="label" style={{ marginBottom: 0, marginLeft: 8 }}>Signal</span>
+          <select value={signal} onChange={e => setSignal(e.target.value)} className="input" style={{ height: 36, padding: '0 10px', width: 'auto' }}>
+            {signalOptions}
           </select>
         </div>
+        <span className="small">{filtered.length} signal{filtered.length !== 1 ? 's' : ''}</span>
       </div>
 
-      {/* Editor's picks */}
-      {recommendations.length > 0 && (
+      {/* Top picks */}
+      {topPicks.length > 0 && (
         <>
           <div style={{ marginBottom: 16 }}>
-            <span className="kicker">Editor's picks</span>
+            <span className="kicker">Top picks</span>
             <h2 style={{ fontSize: 18, fontWeight: 500, letterSpacing: '-0.01em', color: 'var(--ink)', marginTop: 4 }}>
-              Two from each platform
+              Best from each platform
             </h2>
           </div>
           <div className="trend-grid" style={{ marginBottom: 36 }}>
-            {recommendations.slice(0, 3).map((t, i) => <TrendCard key={`rec-${t.id}`} t={t} index={i}/>)}
+            {topPickCards}
           </div>
         </>
       )}
@@ -400,24 +388,35 @@ export default function Dashboard() {
       <div style={{ marginBottom: 16 }}>
         <span className="kicker">The feed</span>
         <h2 style={{ fontSize: 18, fontWeight: 500, letterSpacing: '-0.01em', color: 'var(--ink)', marginTop: 4 }}>
-          {filtered.length} signals across your niches
+          {filtered.length} signals in {nicheLabel}
         </h2>
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="card" style={{ padding: '56px 16px', textAlign: 'center' }}>
-          <p style={{ fontSize: 16, fontWeight: 500, color: 'var(--ink)', marginBottom: 6 }}>Nothing matches those filters</p>
-          <p className="body">Loosen a filter or add a niche to see more trends.</p>
+      {allTrends.length === 0 ? (
+        <div className="card" style={{ padding: '52px 24px', textAlign: 'center' }}>
+          <p style={{ fontSize: 24, marginBottom: 12 }}>📡</p>
+          <p style={{ fontSize: 15, fontWeight: 500, color: 'var(--ink)', marginBottom: 6 }}>No signals found for {nicheLabel}</p>
+          <p className="body" style={{ marginBottom: 20, maxWidth: 380, margin: '0 auto 20px' }}>
+            Scrapers may still be warming up, or API credentials need setup. Try refreshing.
+          </p>
+          <button className="btn btn-primary btn-sm" onClick={handleRefresh} disabled={refreshing}>
+            {refreshing ? <><span className="tdot"/><span className="tdot"/><span className="tdot"/></> : '↻ Try again'}
+          </button>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="card" style={{ padding: '52px 16px', textAlign: 'center' }}>
+          <p style={{ fontSize: 15, fontWeight: 500, color: 'var(--ink)', marginBottom: 6 }}>Nothing matches those filters</p>
+          <p className="body">Try a different platform or signal filter.</p>
         </div>
       ) : (
         <div className="trend-grid">
-          {filtered.map((t, i) => <TrendCard key={t.id} t={t} index={i}/>)}
+          {trendCards}
         </div>
       )}
 
       <div style={{ marginTop: 56, paddingTop: 20, borderTop: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span className="small mono">Creatorpulse · {filtered.length} signals · synced {lastUpdated ? lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</span>
-        <span className="small">You've seen {filtered.length} signals today</span>
+        <button className="btn btn-ghost btn-sm" onClick={handleChangeNiche}>Switch niche →</button>
       </div>
     </div>
   )

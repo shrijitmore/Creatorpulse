@@ -27,6 +27,7 @@ export default function SceneEditModal({ open, onClose, scene, element, script, 
   const [thread, setThread] = useState([])  // conversation history
   const [followupText, setFollowupText] = useState('')
   const [followupLoading, setFollowupLoading] = useState(false)
+  const [error, setError] = useState(null)
   const promptRef = useRef(null)
 
   if (!scene && !element) return null
@@ -48,6 +49,7 @@ export default function SceneEditModal({ open, onClose, scene, element, script, 
     if (!prompt.trim()) return
     setLoading(true)
     setResult(null)
+    setError(null)
     try {
       const data = await editScene({
         sceneNumber: scene?.sceneNumber,
@@ -62,6 +64,14 @@ export default function SceneEditModal({ open, onClose, scene, element, script, 
       setThread([{ prompt: prompt.trim(), suggestion: data.suggestion }])
     } catch (err) {
       console.error('[SceneEditModal] edit error:', err)
+      const msg = err.message || ''
+      let userMsg = msg || 'AI edit failed. Please try again.'
+      try {
+        const body = JSON.parse(msg.replace(/^API \d+: /, ''))
+        if (body?.error?.message) userMsg = body.error.message
+        else if (body?.error?.code) userMsg = body.error.code
+      } catch {}
+      setError(userMsg)
     } finally {
       setLoading(false)
     }
@@ -94,7 +104,7 @@ export default function SceneEditModal({ open, onClose, scene, element, script, 
   }
 
   const handleClose = () => {
-    setPrompt(''); setResult(null); setThread([]); setFollowupText('')
+    setPrompt(''); setResult(null); setThread([]); setFollowupText(''); setError(null)
     onClose()
   }
 
@@ -137,10 +147,29 @@ export default function SceneEditModal({ open, onClose, scene, element, script, 
                 }
                 autoFocus
               />
-              <Button variant="primary" icon={loading ? <Icon.Refresh size={13} className="spin"/> : <Icon.Wand size={13}/>}
-                disabled={!prompt.trim() || loading} onClick={handleSubmit}>
-                {loading ? 'Thinking…' : 'Ask AI'}
+              <Button variant="primary"
+                icon={loading ? <Icon.Refresh size={13} className="spin"/> : <Icon.Wand size={13}/>}
+                disabled={!prompt.trim() || loading} onClick={handleSubmit}
+                style={loading ? { opacity: 1, cursor: 'wait' } : {}}>
+                {loading
+                  ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                      <span className="tdot" style={{ background: 'rgba(255,255,255,0.85)' }}/>
+                      <span className="tdot" style={{ background: 'rgba(255,255,255,0.85)' }}/>
+                      <span className="tdot" style={{ background: 'rgba(255,255,255,0.85)' }}/>
+                    </span>
+                  : 'Ask AI'}
               </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Error state */}
+        {error && (
+          <div className="rounded-lg p-3 border flex items-start gap-2" style={{ background: '#FEF2F2', borderColor: '#FECACA' }}>
+            <Icon.Alert size={14} style={{ color: '#DC2626', flexShrink: 0, marginTop: 1 }}/>
+            <div className="min-w-0">
+              <p className="text-[12.5px] font-medium" style={{ color: '#991B1B' }}>Edit failed</p>
+              <p className="text-[12px] mt-0.5 break-all" style={{ color: '#991B1B' }}>{error}</p>
             </div>
           </div>
         )}

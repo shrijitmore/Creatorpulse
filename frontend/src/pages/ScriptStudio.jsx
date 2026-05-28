@@ -94,9 +94,10 @@ function ScriptPanel({ script, onEditElement }) {
         <div key={s.sceneNumber} className="scene">
           <div className="sc-head">
             <span className="sc-ix">Scene {String(s.sceneNumber).padStart(2, '0')} · {s.duration}</span>
-            <div style={{ display: 'flex', gap: 8, opacity: 0 }} className="sc-actions">
+            <div style={{ display: 'flex', gap: 8 }} className="sc-actions">
               <button className="sc-edit-btn" onClick={() => onEditElement?.({ scene: s, element: 'visual' })}>Edit visual</button>
               <button className="sc-edit-btn" onClick={() => onEditElement?.({ scene: s, element: 'voiceover' })}>Edit VO</button>
+              <CopyBtn text={s.voiceover} label="Copy VO" />
             </div>
           </div>
           <div style={{ marginBottom: 10 }}>
@@ -308,7 +309,7 @@ export default function ScriptStudio() {
   const [editTarget, setEditTarget] = useState(null)
   const [localScript, setLocalScript] = useState(null)
 
-  const { isGenerating, steps, script: generatedScript, contentKit, error, regenerating, generate, cancelGeneration, regenerateContentSection } = useScriptGeneration()
+  const { isGenerating, steps, script: generatedScript, contentKit, error, regenerating, generate, cancelGeneration, regenerateContentSection } = useScriptGeneration(topicId)
   const script = localScript || generatedScript
 
   const handleApplyEdit = ({ element, suggestion, scene, cascading }) => {

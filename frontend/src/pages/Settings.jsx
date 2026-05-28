@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
-import { NICHES } from '../lib/mockData.js'
+import { useNavigate } from 'react-router-dom'
+import { NICHES } from '../constants/niches.js'
+import { COLORS } from '../constants/theme.js'
 import { CONTENT_FORMATS, LANGUAGE_STYLES } from '../constants/platforms.js'
 import { updateNiches, updateSettings, refreshTrends, getProfile, updateProfile } from '../lib/api.js'
 
@@ -66,6 +68,7 @@ function Toggle({ checked, onChange }) {
 }
 
 export default function Settings() {
+  const navigate = useNavigate()
   const [activeSection, setActiveSection] = useState('account')
   const sectionRefs = useRef({})
 
@@ -77,10 +80,11 @@ export default function Settings() {
   const [nicheSaved, setNicheSaved] = useState(false)
   const [nicheError, setNicheError] = useState('')
 
-  const [langStyle, setLangStyle] = useState('english')
+  const [langStyle, setLangStyle] = useState(['english'])
   const [contentFormat, setContentFormat] = useState('on-camera')
   const [prefSaving, setPrefSaving] = useState(false)
   const [prefSaved, setPrefSaved] = useState(false)
+  const [prefError, setPrefError] = useState('')
 
   const storedNotifs = useMemo(() => { try { return JSON.parse(localStorage.getItem('cp_notifs') || '{}') } catch { return {} } }, [])
   const [notifDailyDigest, setNotifDailyDigest] = useState(storedNotifs.dailyDigest ?? true)
@@ -105,21 +109,35 @@ export default function Settings() {
   useEffect(() => {
     getProfile().then(d => {
       if (d?.profile?.languageStyle) {
-        const match = LANGUAGE_STYLES.find(l => l.label.toLowerCase() === d.profile.languageStyle.toLowerCase())
-        if (match) setLangStyle(match.id)
+        const labels = d.profile.languageStyle.split(',').map(s => s.trim().toLowerCase())
+        const ids = LANGUAGE_STYLES.filter(l => labels.includes(l.label.toLowerCase())).map(l => l.id)
+        if (ids.length) setLangStyle(ids)
       }
-      if (d?.profile?.contentFormat) setContentFormat(d.profile.contentFormat)
+      if (d?.profile?.contentFormat) {
+        const raw = d.profile.contentFormat
+        const byId    = CONTENT_FORMATS.find(f => f.id === raw)
+        const byLabel = CONTENT_FORMATS.find(f => f.label.toLowerCase() === raw.toLowerCase())
+        setContentFormat(byId?.id || byLabel?.id || raw)
+      }
     }).catch(() => {})
   }, [])
 
   const savePreferences = async () => {
     setPrefSaving(true)
+    setPrefError('')
     try {
-      const langLabel = LANGUAGE_STYLES.find(l => l.id === langStyle)?.label || 'English'
+      const langLabel = langStyle
+        .map(id => LANGUAGE_STYLES.find(l => l.id === id)?.label)
+        .filter(Boolean)
+        .join(', ') || 'English'
       await updateProfile({ languageStyle: langLabel, contentFormat })
-      setPrefSaved(true); setTimeout(() => setPrefSaved(false), 2500)
-    } catch {}
-    finally { setPrefSaving(false) }
+      setPrefSaved(true)
+      setTimeout(() => setPrefSaved(false), 2500)
+    } catch (e) {
+      setPrefError('Failed to save. Please try again.')
+    } finally {
+      setPrefSaving(false)
+    }
   }
 
   const saveNotifications = useCallback((updates) => {
@@ -228,7 +246,7 @@ export default function Settings() {
                 )
               })}
             </div>
-            {nicheError && <p style={{ fontSize: 12, color: 'rgb(192,74,46)', marginTop: 10 }}>{nicheError}</p>}
+            {nicheError && <p style={{ fontSize: 12, color: COLORS.error, marginTop: 10 }}>{nicheError}</p>}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--line)' }}>
               <span className="small">{selectedNiches.length} niche{selectedNiches.length !== 1 ? 's' : ''} selected</span>
               <button
@@ -250,11 +268,11 @@ export default function Settings() {
               <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--mono)' }}>Language style</p>
               <div className="set-row" style={{ marginTop: 0 }}>
                 {LANGUAGE_STYLES.filter(l => l.id !== 'other').map(l => {
-                  const on = langStyle === l.id
+                  const on = langStyle.includes(l.id)
                   return (
                     <button
                       key={l.id}
-                      onClick={() => setLangStyle(l.id)}
+                      onClick={() => setLangStyle(prev => prev.includes(l.id) ? prev.filter(x => x !== l.id) : [...prev, l.id])}
                       style={{
                         textAlign: 'left', padding: '14px 16px', borderRadius: 12,
                         border: `1px solid ${on ? 'var(--ink)' : 'var(--line)'}`,
@@ -302,7 +320,8 @@ export default function Settings() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--line)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--line)' }}>
+              {prefError && <p style={{ fontSize: 12, color: '#DC2626' }}>{prefError}</p>}
               <button className="btn btn-primary btn-sm" disabled={prefSaving} onClick={savePreferences}>
                 {prefSaved ? '✓ Saved' : prefSaving ? 'Saving…' : 'Save preferences'}
               </button>
@@ -339,35 +358,19 @@ export default function Settings() {
             <span className="kicker">Plan</span>
             <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)', marginTop: 4, marginBottom: 4 }}>Your subscription</h2>
 
-            <div style={{ marginTop: 20, padding: '16px 20px', border: '2px dashed var(--line)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ marginTop: 20, padding: '20px 24px', border: '1px solid var(--line)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
               <div>
-                <span className="chip" style={{ marginBottom: 8, display: 'inline-flex' }}>Free tier</span>
-                <p className="body" style={{ marginTop: 4 }}>5 scripts/month · 3 niches · English only · Reddit + YouTube</p>
-              </div>
-            </div>
-
-            <div className="set-row" style={{ marginTop: 16 }}>
-              {[
-                { tier: 'Pro', price: '₹999/mo', features: ['Unlimited scripts', 'All platforms + languages', 'Recording + AI coaching', 'Instagram trends', 'Priority scraping'] },
-                { tier: 'Agency', price: '₹4,999/mo', features: ['Everything in Pro', 'Multiple creator profiles', 'Bulk script generation', 'Advanced analytics', 'Dedicated support'] },
-              ].map(plan => (
-                <div key={plan.tier} style={{ padding: '20px', border: '1px solid var(--line)', borderRadius: 12, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)' }}>{plan.tier}</p>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-2)', fontFamily: 'var(--mono)' }}>{plan.price}</p>
-                  </div>
-                  <ul className="set-ul" style={{ marginTop: 0 }}>
-                    {plan.features.map(f => (
-                      <li key={f} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ color: 'var(--ink)', flexShrink: 0 }}>✓</span> {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <button className="btn btn-line btn-sm" style={{ marginTop: 'auto' }}>
-                    Upgrade to {plan.tier} (coming soon)
-                  </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <span className="chip">Free tier</span>
                 </div>
-              ))}
+                <p className="small">5 scripts/month · 3 niches · English only · Reddit + YouTube</p>
+              </div>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => navigate('/plans')}
+                style={{ flexShrink: 0 }}>
+                View plans
+              </button>
             </div>
           </div>
 

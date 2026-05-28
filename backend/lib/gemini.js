@@ -48,12 +48,22 @@ export function createGeminiModel({ temperature = 0.7, maxOutputTokens = 3000 } 
   const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1'
   const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
 
+  // Reduce safety thresholds so creative/controversial content isn't blocked.
+  // BLOCK_ONLY_HIGH still catches genuinely dangerous output.
+  const safetySettings = [
+    { category: 'HARM_CATEGORY_HATE_SPEECH',       threshold: 'BLOCK_ONLY_HIGH' },
+    { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+    { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_ONLY_HIGH' },
+    { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+  ]
+
   const config = {
     model,
     temperature,
     maxOutputTokens,
     location,
     project,
+    safetySettings,
   }
 
   if (credentials) {
@@ -206,6 +216,8 @@ export function extractJson(text) {
       else if (ch === '}' || ch === ']') { stack.pop(); depth-- }
     }
     truncated += stack.reverse().join('')
+    truncated = truncated.replace(/,\s*([}\]])/g, '$1')
+    truncated = truncated.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)(\s*:)/g, (_, pre, key, colon) => `${pre}"${key}"${colon}`)
     try { return JSON.parse(truncated) } catch {}
     throw new Error('No JSON object found in Gemini response')
   }
@@ -216,6 +228,10 @@ export function extractJson(text) {
   jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1')
   // Remove JS comments
   jsonStr = jsonStr.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '')
+  // Fix unquoted object keys: { key: value } → { "key": value }
+  jsonStr = jsonStr.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)(\s*:)/g, (_, pre, key, colon) => `${pre}"${key}"${colon}`)
+  // Fix single-quoted strings → double-quoted
+  jsonStr = jsonStr.replace(/'(?:[^'\\]|\\.)*'/g, m => '"' + m.slice(1, -1).replace(/\\'/g, "'").replace(/(?<!\\)"/g, '\\"') + '"')
 
   try { return JSON.parse(jsonStr) } catch {}
 

@@ -150,6 +150,11 @@ export async function getOnboardingStatus() {
   return data.data || data
 }
 
+export async function resetOnboarding() {
+  const data = await apiFetch('/api/onboarding/reset', { method: 'POST' })
+  return data
+}
+
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
 export async function getProfile() {
@@ -210,6 +215,30 @@ export async function followupScene({ previousSuggestion, followupPrompt, elemen
   const data = await apiFetch('/api/scene/followup', {
     method: 'POST',
     body: JSON.stringify({ previousSuggestion, followupPrompt, element, tone, niche })
+  })
+  return data.data || data
+}
+
+export async function createBillingOrder({ planId, cycle, coupon = '' }) {
+  const data = await apiFetch('/api/billing/create-order', {
+    method: 'POST',
+    body: JSON.stringify({ planId, cycle, coupon })
+  })
+  return data.data || data
+}
+
+export async function verifyBillingPayment({ orderId, paymentId, signature, planId, cycle }) {
+  const data = await apiFetch('/api/billing/verify', {
+    method: 'POST',
+    body: JSON.stringify({ orderId, paymentId, signature, planId, cycle })
+  })
+  return data.data || data
+}
+
+export async function interpretNiche(query) {
+  const data = await apiFetch('/api/niches/interpret', {
+    method: 'POST',
+    body: JSON.stringify({ query })
   })
   return data.data || data
 }

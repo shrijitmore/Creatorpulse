@@ -222,4 +222,10 @@ cd frontend && npm run build
 
 ## License
 
-Private — all rights reserved.
+[GNU Affero General Public License v3.0](./LICENSE) — open source, copyleft.
+
+If you run a modified version as a service, you must open-source your changes.
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md). Report security issues privately per [SECURITY.md](./SECURITY.md).

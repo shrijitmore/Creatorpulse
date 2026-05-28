@@ -1,10 +1,13 @@
 import { createRequire } from 'module'
 import { tmpdir } from 'os'
 import { join } from 'path'
+import { rm, writeFile, unlink } from 'fs/promises'
+import { existsSync } from 'fs'
 
 const require = createRequire(import.meta.url)
 
 let db = null
+let pgliteClient = null
 
 // ── Supabase / PostgreSQL ─────────────────────────────────────────────────────
 
@@ -26,18 +29,71 @@ function initPg(connectionString) {
 
 // ── PGlite (local dev fallback) ───────────────────────────────────────────────
 
+const LOCK_FILE = join(tmpdir(), 'pglite-trendforge.lock')
+
+async function acquireProcessLock() {
+  // If a stale lock file exists from a crashed process, remove it first.
+  if (existsSync(LOCK_FILE)) {
+    try {
+      const pid = parseInt((await import('fs')).readFileSync(LOCK_FILE, 'utf8'))
+      // Check if that PID is still alive (platform-safe: kill 0 just checks)
+      try { process.kill(pid, 0) } catch { await unlink(LOCK_FILE).catch(() => {}) }
+    } catch { await unlink(LOCK_FILE).catch(() => {}) }
+  }
+  // Write our own PID as the lock
+  await writeFile(LOCK_FILE, String(process.pid))
+}
+
+async function releaseLock() {
+  await unlink(LOCK_FILE).catch(() => {})
+}
+
 async function initPglite() {
   const { PGlite } = await import('@electric-sql/pglite')
   const dbPath = join(tmpdir(), 'pglite-trendforge')
   console.log(`[db] PGlite path: ${dbPath}`)
-  const client = new PGlite(dbPath)
-  await client.waitReady
+
+  await acquireProcessLock()
+
+  async function tryOpen(path) {
+    const c = new PGlite(path)
+    await c.waitReady
+    return c
+  }
+
+  let client
+  try {
+    client = await tryOpen(dbPath)
+  } catch (err) {
+    // node --watch restarts before the old process releases the lock.
+    console.warn('[db] PGlite init failed, retrying in 1.5s...')
+    await new Promise(r => setTimeout(r, 1500))
+    try {
+      client = await tryOpen(dbPath)
+    } catch {
+      // Data dir is unrecoverable — wipe and recreate (dev only, last resort).
+      console.warn('[db] PGlite still failing, resetting data directory...')
+      await rm(dbPath, { recursive: true, force: true })
+      client = await tryOpen(dbPath)
+    }
+  }
+
+  pgliteClient = client
   return {
     query: async (sql, params) => {
       const result = await client.query(sql, params)
       return { rows: result.rows }
     }
   }
+}
+
+export async function closeDb() {
+  if (pgliteClient) {
+    try { await pgliteClient.close() } catch {}
+    pgliteClient = null
+  }
+  await releaseLock()
+  db = null
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -104,6 +160,9 @@ async function runMigrations(db) {
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS niches TEXT[]`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_id TEXT`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS plan TEXT DEFAULT 'free'`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_cycle TEXT DEFAULT 'monthly'`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_expires_at TIMESTAMPTZ`,
     // Ensure clerk_id unique index exists (ALTER TABLE ADD COLUMN does not add constraints)
     `CREATE UNIQUE INDEX IF NOT EXISTS users_clerk_id_unique ON users (clerk_id) WHERE clerk_id IS NOT NULL`,
 
