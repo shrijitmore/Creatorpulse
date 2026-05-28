@@ -11,7 +11,7 @@
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-Email: flashpactone@gmail.com
+Email: orangeglazz@gmail.com
 
 Include:
 - Description of the vulnerability

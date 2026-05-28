@@ -8,7 +8,11 @@
       "Bash(cmd.exe /c \"tasklist /FI \\\\\"PID eq 1840\\\\\"\")",
       "Bash(powershell -Command \"Stop-Process -Id 1840 -Force; Write-Host 'killed'\")",
       "PowerShell(Invoke-WebRequest -Uri \"http://localhost:3000/health\" -UseBasicParsing -ErrorAction SilentlyContinue)",
-      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:8081\" -UseBasicParsing -ErrorAction SilentlyContinue)"
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:8081\" -UseBasicParsing -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Process -Name \"node\" -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -eq \"\" } | Select-Object Id, CPU, WorkingSet)",
+      "PowerShell($env:CLERK_SECRET_KEY = \"\"; cd d:\\\\Creatorpulse\\\\backend; node server.js 2>&1)",
+      "PowerShell(Stop-Process -Id 37944 -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 500; $env:CLERK_SECRET_KEY = $null; [System.Environment]::SetEnvironmentVariable\\(\"CLERK_SECRET_KEY\", $null, \"Process\"\\); cd d:\\\\Creatorpulse\\\\backend; node -e \"console.log\\('CLERK_SK:', process.env.CLERK_SECRET_KEY\\)\")",
+      "PowerShell(cd d:\\\\Creatorpulse\\\\backend; $env:CLERK_SECRET_KEY = $null; [System.Environment]::SetEnvironmentVariable\\(\"CLERK_SECRET_KEY\", $null, \"Process\"\\); node server.js 2>&1)"
     ]
   }
 }

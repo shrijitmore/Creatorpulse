@@ -16,7 +16,7 @@
 
 ## Enforcement
 
-Violations can be reported to flashpactone@gmail.com. Maintainers will review and respond within 72 hours. Consequences range from a warning to a permanent ban, depending on severity.
+Violations can be reported to orangeglazz@gmail.com. Maintainers will review and respond within 72 hours. Consequences range from a warning to a permanent ban, depending on severity.
 
 ## Attribution
 
