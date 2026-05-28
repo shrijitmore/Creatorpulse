@@ -9,7 +9,7 @@
   "dependencies": {
     "@clerk/backend": "^1.0.0",
     "@clerk/express": "^2.1.15",
-    "@electric-sql/pglite": "^0.2.0",
+    "@electric-sql/pglite": "^0.4.6",
     "@langchain/core": "^0.3.0",
     "@langchain/google-vertexai": "^0.1.0",
     "@langchain/langgraph": "^0.2.0",
