@@ -7,6 +7,9 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 8080,
     allowedHosts: true,
+    hmr: process.env.NGROK_HOST
+      ? { host: process.env.NGROK_HOST, protocol: 'ws', clientPort: 443 }
+      : true,
     proxy: {
       '/api': {
         target: process.env.VITE_API_URL || 'http://localhost:3000',

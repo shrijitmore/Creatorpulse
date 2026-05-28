@@ -163,7 +163,8 @@ function ReasoningViz() {
 export default function Landing() {
   const navigate = useNavigate()
   const { isSignedIn } = useUser()
-  const goSignIn = () => navigate(isSignedIn ? '/dashboard' : '/sign-in')
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const goSignIn = () => { setMobileOpen(false); navigate(isSignedIn ? '/dashboard' : '/sign-in') }
 
   return (
     <div className="landing">
@@ -179,11 +180,26 @@ export default function Landing() {
               <a href="#pricing">Pricing</a>
             </nav>
             <div className="row" style={{ gap: 8 }}>
-              <button className="btn btn-ghost btn-sm" onClick={goSignIn}>Sign in</button>
-              <button className="btn btn-primary btn-sm" onClick={() => navigate('/sign-up')}>Get started free</button>
+              <button className="btn btn-ghost btn-sm ln-desktop-only" onClick={goSignIn}>Sign in</button>
+              <button className="btn btn-primary btn-sm ln-desktop-only" onClick={() => navigate('/sign-up')}>Get started free</button>
+              <button className="ln-hamburger" onClick={() => setMobileOpen(o => !o)} aria-label="Toggle menu">
+                <span className={mobileOpen ? 'open' : ''}/>
+                <span className={mobileOpen ? 'open' : ''}/>
+                <span className={mobileOpen ? 'open' : ''}/>
+              </button>
             </div>
           </div>
         </div>
+        {mobileOpen && (
+          <div className="ln-mobile-menu">
+            <a href="#features" onClick={() => setMobileOpen(false)}>Features</a>
+            <a href="#process" onClick={() => setMobileOpen(false)}>How it works</a>
+            <a href="#pricing" onClick={() => setMobileOpen(false)}>Pricing</a>
+            <hr style={{ border: 'none', borderTop: '1px solid var(--line)', margin: '4px 0' }}/>
+            <button className="btn btn-ghost btn-sm" style={{ width: '100%', justifyContent: 'center' }} onClick={goSignIn}>Sign in</button>
+            <button className="btn btn-primary btn-sm" style={{ width: '100%', justifyContent: 'center' }} onClick={() => { setMobileOpen(false); navigate('/sign-up') }}>Get started free</button>
+          </div>
+        )}
       </nav>
 
       {/* ── Hero ── */}
