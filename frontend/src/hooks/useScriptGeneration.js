@@ -54,7 +54,8 @@ export function useScriptGeneration(topicId) {
       },
       (err) => {
         console.error('Generation error:', err)
-        setError(err || 'Generation failed. Please try again.')
+        const msg = typeof err === 'string' && err.length < 120 ? err : 'Script generation failed. Please try again.'
+        setError(msg)
         setIsGenerating(false)
       }
     )
