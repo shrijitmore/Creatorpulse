@@ -207,7 +207,7 @@ export default function NichePicker({ onSelect }) {
             value={customText}
             onChange={e => { setCustomText(e.target.value); setInterpretError('') }}
             onKeyDown={e => e.key === 'Enter' && !interpreting && customText.trim() && handleCustomSubmit(customText)}
-            placeholder="e.g. "sourdough bread baking" or "dog training for puppies""
+            placeholder='e.g. "sourdough bread baking" or "dog training for puppies"'
             disabled={interpreting}
             style={{ flex: 1 }}
           />
