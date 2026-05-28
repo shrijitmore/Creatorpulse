@@ -157,6 +157,15 @@ export const NICHE_IDS = NICHES.map(n => n.id)
 
 export const getNiche = (id) => NICHES.find(n => n.id === id)
 
+export const TRENDING_NICHES = [
+  { id: 'ai-tech',       growth: 42 },
+  { id: 'finance',       growth: 38 },
+  { id: 'fitness',       growth: 31 },
+  { id: 'gaming',        growth: 28 },
+  { id: 'cooking',       growth: 24 },
+  { id: 'mental-health', growth: 19 },
+]
+
 /** Instagram hashtags per niche (no # prefix) */
 export const NICHE_IG_HASHTAGS = {
   finance:        ['personalfinance', 'moneymanagement', 'financialtips', 'moneymindset', 'budgeting'],

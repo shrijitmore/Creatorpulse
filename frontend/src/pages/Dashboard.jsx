@@ -138,14 +138,16 @@ function CreatorBrief({ apiProfile, stats }) {
 function IdlePhase({ onSelect }) {
   const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
   return (
-    <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 16px' }}>
-      <span className="kicker" style={{ justifyContent: 'center', marginBottom: 12 }}>{todayStr}</span>
-      <h1 style={{ fontSize: 28, fontWeight: 500, letterSpacing: '-0.02em', color: 'var(--ink)', textAlign: 'center', marginBottom: 8 }}>
-        What's your niche?
-      </h1>
-      <p className="body" style={{ textAlign: 'center', maxWidth: 480, marginBottom: 40 }}>
-        Pick from 70+ presets or describe your own — AI will find the right signals for you.
-      </p>
+    <div className="fade-up" style={{ width: '100%' }}>
+      <div style={{ textAlign: 'center', padding: '40px 16px 36px' }}>
+        <span className="kicker" style={{ justifyContent: 'center', marginBottom: 10 }}>{todayStr}</span>
+        <h1 style={{ fontSize: 30, fontWeight: 500, letterSpacing: '-0.025em', color: 'var(--ink)', marginBottom: 10 }}>
+          What's your niche?
+        </h1>
+        <p className="body" style={{ maxWidth: 440, margin: '0 auto' }}>
+          Pick from 70+ presets or describe your own — AI will find the right signals for you.
+        </p>
+      </div>
       <NichePicker onSelect={onSelect}/>
     </div>
   )
