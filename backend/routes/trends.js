@@ -4,6 +4,8 @@ import { requireAuth } from '../lib/auth.js'
 import { getCreatorProfile } from '../lib/memory.js'
 import { getDb } from '../db.js'
 import { CACHE_TTL } from '../constants.js'
+import { trendsRefreshLimiter } from '../lib/limiters.js'
+import { validate, NICHE_RE } from '../lib/validate.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -54,9 +56,19 @@ async function getUserContext(userId) {
 // GET /api/trends
 router.get('/', async (req, res) => {
   try {
-    const queryNiches = req.query.niches
+    const rawNiches = req.query.niches
       ? req.query.niches.split(',').map(s => s.trim()).filter(Boolean)
       : []
+
+    // Validate each niche — they go into Redis cache keys so must be safe chars
+    const invalidNiche = rawNiches.find(n => n.length > 50 || !NICHE_RE.test(n))
+    if (invalidNiche) {
+      return res.status(400).json({ success: false, error: { code: 'INVALID_NICHE', message: `Invalid niche value: "${invalidNiche}"` } })
+    }
+    if (rawNiches.length > 10) {
+      return res.status(400).json({ success: false, error: { code: 'TOO_MANY_NICHES', message: 'Maximum 10 niches per request' } })
+    }
+    const queryNiches = rawNiches
 
     const [niches, userCtx] = await Promise.all([
       queryNiches.length > 0 ? Promise.resolve(queryNiches) : getUserNiches(req.userId),
@@ -106,7 +118,18 @@ router.get('/', async (req, res) => {
 })
 
 // POST /api/trends/refresh — bypasses cache, re-scrapes, updates shared cache
-router.post('/refresh', async (req, res) => {
+router.post(
+  '/refresh',
+  trendsRefreshLimiter,
+  validate({
+    body: {
+      niches: {
+        type: 'array', maxItems: 10,
+        itemType: 'string', itemMaxLength: 50, itemPattern: NICHE_RE,
+      },
+    },
+  }),
+  async (req, res) => {
   try {
     const { niches: bodyNiches = [] } = req.body
     const [niches, userCtx] = await Promise.all([
@@ -138,7 +161,8 @@ router.post('/refresh', async (req, res) => {
     console.error('[trends POST /refresh] Error:', err)
     res.status(500).json({ success: false, error: { code: 'REFRESH_ERROR', message: err.message } })
   }
-})
+  }
+)
 
 // ── Language personalisation (post-cache) ─────────────────────────────────────
 

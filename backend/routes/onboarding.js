@@ -3,6 +3,8 @@ import { requireAuth } from '../lib/auth.js'
 import { processOnboarding, validateOnboardingStep } from '../agents/onboarding.js'
 import { getCreatorProfile } from '../lib/memory.js'
 import { getDb } from '../db.js'
+import { accountCreationLimiter } from '../lib/limiters.js'
+import { validate, sanitizeText } from '../lib/validate.js'
 
 const router = Router()
 
@@ -41,16 +43,19 @@ router.get('/status', requireAuth, async (req, res) => {
 })
 
 // POST /api/onboarding/validate — validate a single step
-router.post('/validate', requireAuth, async (req, res) => {
+router.post('/validate', requireAuth, validate({
+  body: {
+    step:  { required: true, type: 'string', maxLength: 50 },
+    value: { type: 'string', maxLength: 500 },
+  },
+}), async (req, res) => {
   const { step, value } = req.body
-  if (!step) return res.status(400).json({ success: false, error: { code: 'MISSING_STEP', message: 'step required' } })
-
   const error = validateOnboardingStep(step, value)
   res.json({ success: true, data: { valid: !error, error } })
 })
 
 // POST /api/onboarding/complete — submit all answers, process profile
-router.post('/complete', requireAuth, async (req, res) => {
+router.post('/complete', requireAuth, accountCreationLimiter, async (req, res) => {
   try {
     const { answers } = req.body
 
@@ -63,11 +68,22 @@ router.post('/complete', requireAuth, async (req, res) => {
       return res.status(400).json({ success: false, error: { code: 'MISSING_NAME', message: 'creatorName is required' } })
     }
 
+    // Sanitize text fields before they reach AI prompts
+    const safeAnswers = {
+      ...answers,
+      creatorName:     sanitizeText(answers.creatorName, 100),
+      audiencePersona: sanitizeText(answers.audiencePersona, 500),
+      primaryGoal:     sanitizeText(answers.primaryGoal, 200),
+      rawVoiceSample:  sanitizeText(answers.rawVoiceSample, 10000),
+      languageStyle:   sanitizeText(answers.languageStyle, 50),
+      contentFormat:   sanitizeText(answers.contentFormat, 50),
+    }
+
     const db = await getDb()
 
     // Derive niches from content styles + audience
     const styleNicheMap = { educational:'tech', entertaining:'lifestyle', controversial:'finance', storytelling:'fitness' }
-    const selectedStyles = Array.isArray(answers.contentStyles) ? answers.contentStyles : []
+    const selectedStyles = Array.isArray(safeAnswers.contentStyles) ? safeAnswers.contentStyles : []
     const derivedNiches = selectedStyles.map(s => styleNicheMap[s.toLowerCase()] || s.toLowerCase()).filter(Boolean)
     const niches = derivedNiches.length > 0 ? [...new Set(derivedNiches)] : ['fitness', 'tech', 'finance']
 
@@ -76,11 +92,11 @@ router.post('/complete', requireAuth, async (req, res) => {
       `INSERT INTO users (id, email, name, niches)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, niches = EXCLUDED.niches, updated_at = NOW()`,
-      [req.userId, `${req.userId}@clerk.user`, answers.creatorName, niches]
+      [req.userId, `${req.userId}@clerk.user`, safeAnswers.creatorName, niches]
     )
 
     // Process onboarding — extract voice traits, save profile
-    const profile = await processOnboarding(req.userId, { ...answers, niches })
+    const profile = await processOnboarding(req.userId, { ...safeAnswers, niches })
 
     res.json({ success: true, data: { profile } })
   } catch (err) {

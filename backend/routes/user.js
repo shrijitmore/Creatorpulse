@@ -1,140 +1,55 @@
 import { Router } from 'express'
 import { getDb } from '../db.js'
 import { requireAuth } from '../lib/auth.js'
+import { validate, NICHE_RE } from '../lib/validate.js'
 
 const router = Router()
 
-const HARDCODED_USER = {
-  id: 'user-1',
-  email: 'alex@trendforge.io',
-  niches: ['fitness', 'tech']
-}
-
-// Track niches in memory as fallback (updated by PATCH)
-let currentNiches = ['fitness', 'tech']
-
-// POST /api/auth/login  →  mounted at /api/auth so path = /login
-router.post('/login', async (req, res) => {
+// GET /api/auth/me — returns the authenticated user's profile from DB
+router.get('/me', requireAuth, async (req, res) => {
   try {
-    const { email, password } = req.body
+    const db = await getDb()
+    const result = await db.query(
+      'SELECT id, email, niches, plan, created_at FROM users WHERE id = $1',
+      [req.userId]
+    )
 
-    if (!email || !password) {
-      return res.status(400).json({
+    if (!result.rows.length) {
+      return res.status(404).json({
         success: false,
-        error: { code: 'INVALID_INPUT', message: 'email and password are required' }
+        error: { code: 'USER_NOT_FOUND', message: 'User not found' }
       })
     }
 
-    if (email !== 'alex@trendforge.io' || password !== 'demo123') {
-      return res.status(401).json({
-        success: false,
-        error: { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' }
-      })
-    }
-
-    // Fetch latest niches from DB
-    let niches = currentNiches
-    try {
-      const db = await getDb()
-      const result = await db.query('SELECT niches FROM users WHERE id = $1', ['user-1'])
-      if (result.rows && result.rows.length > 0) {
-        niches = result.rows[0].niches || currentNiches
-      }
-    } catch (dbErr) {
-      console.error('[user/login] DB error:', dbErr.message)
-    }
-
-    res.json({
-      success: true,
-      data: {
-        user: { ...HARDCODED_USER, niches }
-      }
-    })
-  } catch (err) {
-    console.error('[user/login] Error:', err)
-    res.status(500).json({
-      success: false,
-      error: { code: 'SERVER_ERROR', message: err.message || 'Login failed' }
-    })
-  }
-})
-
-// GET /api/auth/me  →  mounted at /api/auth so path = /me
-router.get('/me', async (req, res) => {
-  try {
-    let niches = currentNiches
-    try {
-      const db = await getDb()
-      const result = await db.query('SELECT niches FROM users WHERE id = $1', ['user-1'])
-      if (result.rows && result.rows.length > 0) {
-        niches = result.rows[0].niches || currentNiches
-      }
-    } catch (dbErr) {
-      console.error('[user/me] DB error:', dbErr.message)
-    }
-
-    res.json({
-      success: true,
-      data: {
-        user: { ...HARDCODED_USER, niches }
-      }
-    })
+    res.json({ success: true, data: { user: result.rows[0] } })
   } catch (err) {
     console.error('[user/me] Error:', err)
     res.status(500).json({
       success: false,
-      error: { code: 'SERVER_ERROR', message: err.message || 'Failed to fetch user' }
+      error: { code: 'SERVER_ERROR', message: 'Failed to fetch user' }
     })
   }
 })
 
 // PATCH /api/user/niches
-router.patch('/niches', requireAuth, async (req, res) => {
+router.patch('/niches', requireAuth, validate({
+  body: {
+    niches: { required: true, type: 'array', minItems: 1, maxItems: 20, itemType: 'string', itemMaxLength: 50, itemPattern: NICHE_RE },
+  },
+}), async (req, res) => {
   try {
     const { niches } = req.body
-
-    if (!niches || !Array.isArray(niches)) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_INPUT', message: 'niches must be an array of strings' }
-      })
-    }
-
     const cleanNiches = niches.map(n => String(n).toLowerCase().trim()).filter(Boolean)
 
-    if (cleanNiches.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_INPUT', message: 'niches array cannot be empty' }
-      })
-    }
+    const db = await getDb()
+    await db.query('UPDATE users SET niches = $1, updated_at = NOW() WHERE id = $2', [cleanNiches, req.userId])
 
-    // Update DB
-    try {
-      const db = await getDb()
-      await db.query('UPDATE users SET niches = $1 WHERE id = $2', [cleanNiches, req.userId])
-    } catch (dbErr) {
-      console.error('[user/niches] DB update error:', dbErr.message)
-    }
-
-    // Update in-memory fallback
-    currentNiches = cleanNiches
-
-    res.json({
-      success: true,
-      data: {
-        user: {
-          id: HARDCODED_USER.id,
-          email: HARDCODED_USER.email,
-          niches: cleanNiches
-        }
-      }
-    })
+    res.json({ success: true, data: { niches: cleanNiches } })
   } catch (err) {
     console.error('[user/niches] Error:', err)
     res.status(500).json({
       success: false,
-      error: { code: 'SERVER_ERROR', message: err.message || 'Failed to update niches' }
+      error: { code: 'SERVER_ERROR', message: 'Failed to update niches' }
     })
   }
 })

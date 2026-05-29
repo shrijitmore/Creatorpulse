@@ -7,6 +7,8 @@ import { getDb } from '../db.js'
 import { requireAuth } from '../lib/auth.js'
 import { buildCreatorContext } from '../lib/memory.js'
 import { storeScriptEmbedding, trackTopic } from '../lib/embeddings.js'
+import { aiGenerationLimiter, aiAssistLimiter, requireBrowserLike } from '../lib/limiters.js'
+import { validate, sanitizeText, VALID_TONES, VALID_FORMATS, VALID_SECTIONS, NICHE_RE } from '../lib/validate.js'
 
 const router = Router()
 
@@ -18,7 +20,21 @@ function sendSSE(res, event, data) {
 router.use(requireAuth)
 
 // POST /api/scripts/generate  (SSE)
-router.post('/generate', async (req, res) => {
+// Note: validate() returns 400 JSON for SSE routes too — clients handle both shapes.
+router.post(
+  '/generate',
+  requireBrowserLike,
+  aiGenerationLimiter,
+  validate({
+    body: {
+      topicTitle: { required: true, type: 'string', maxLength: 200 },
+      tone:       { required: true, type: 'string', oneOf: VALID_TONES },
+      format:     { required: true, type: 'string', oneOf: VALID_FORMATS },
+      niche:      { required: true, type: 'string', maxLength: 50, pattern: NICHE_RE },
+      topicId:    { type: 'string', maxLength: 64 },
+    },
+  }),
+  async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
   res.setHeader('Connection', 'keep-alive')
@@ -26,23 +42,6 @@ router.post('/generate', async (req, res) => {
   res.flushHeaders()
 
   const { topicId, topicTitle, tone, format, niche } = req.body
-
-  if (!topicTitle || !tone || !format || !niche) {
-    sendSSE(res, 'error', { message: 'Missing required fields: topicTitle, tone, format, niche' })
-    return res.end()
-  }
-
-  const validTones = ['educational', 'entertaining', 'controversial', 'storytelling']
-  const validFormats = ['30s', '60s', '90s']
-
-  if (!validTones.includes(tone)) {
-    sendSSE(res, 'error', { message: `Invalid tone. Must be one of: ${validTones.join(', ')}` })
-    return res.end()
-  }
-  if (!validFormats.includes(format)) {
-    sendSSE(res, 'error', { message: `Invalid format. Must be one of: ${validFormats.join(', ')}` })
-    return res.end()
-  }
 
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -54,7 +53,7 @@ router.post('/generate', async (req, res) => {
     sendSSE(res, 'progress', { step: 2, status: 'active', label: 'Analyzing virality signals...' })
 
     // Fetch creator context (RAG + voice profile) in parallel with step 2 delay
-    const userId = req.userId || 'user-1'
+    const userId = req.userId
     const creatorContext = await buildCreatorContext(userId, topicTitle, niche).catch(() => null)
 
     await sleep(300)
@@ -103,24 +102,31 @@ router.post('/generate', async (req, res) => {
     sendSSE(res, 'error', { message: err.message || 'Script generation failed' })
     res.end()
   }
-})
+  }
+)
 
 // POST /api/scripts/regenerate-section
-router.post('/regenerate-section', async (req, res) => {
+router.post(
+  '/regenerate-section',
+  requireBrowserLike,
+  aiAssistLimiter,
+  validate({
+    body: {
+      scriptId: { required: true, type: 'uuid' },
+      section:  { required: true, type: 'string', oneOf: VALID_SECTIONS },
+      tone:     { type: 'string', oneOf: VALID_TONES },
+      format:   { type: 'string', oneOf: VALID_FORMATS },
+    },
+  }),
+  async (req, res) => {
   try {
     const { scriptId, section, tone, format } = req.body
 
-    if (!scriptId || !section) {
-      return res.status(400).json({ success: false, error: { code: 'INVALID_INPUT', message: 'scriptId and section are required' } })
-    }
-
-    const validSections = ['hookVariants', 'caption', 'hashtags', 'thumbnailText', 'fullScript']
-    if (!validSections.includes(section)) {
-      return res.status(400).json({ success: false, error: { code: 'INVALID_SECTION', message: `section must be one of: ${validSections.join(', ')}` } })
-    }
-
     const db = await getDb()
-    const scriptRes = await db.query('SELECT * FROM scripts WHERE id = $1', [scriptId])
+    const scriptRes = await db.query(
+      'SELECT * FROM scripts WHERE id = $1 AND user_id = $2',
+      [scriptId, req.userId]
+    )
 
     if (!scriptRes.rows || scriptRes.rows.length === 0) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Script not found' } })
@@ -140,8 +146,10 @@ router.post('/regenerate-section', async (req, res) => {
     if (section === 'fullScript') {
       const newScript = await writeScript(existingScript.topicId, existingScript.topicTitle, existingScript.tone, existingScript.format, existingScript.niche)
       content = { hookLine: newScript.hookLine, scenes: newScript.scenes, cta: newScript.cta }
-      await db.query(`UPDATE scripts SET hook_line = $1, scenes = $2, cta = $3 WHERE id = $4`,
-        [newScript.hookLine, JSON.stringify(newScript.scenes), newScript.cta, scriptId])
+      await db.query(
+        `UPDATE scripts SET hook_line = $1, scenes = $2, cta = $3 WHERE id = $4 AND user_id = $5`,
+        [newScript.hookLine, JSON.stringify(newScript.scenes), newScript.cta, scriptId, req.userId]
+      )
     } else {
       const kit = await generateCopyKit(existingScript, existingScript.topicTitle, existingScript.niche)
       if (section === 'hookVariants') content = kit.hookVariants
@@ -163,10 +171,20 @@ router.post('/regenerate-section', async (req, res) => {
     console.error('[scripts/regenerate-section] Error:', err)
     res.status(500).json({ success: false, error: { code: 'REGEN_ERROR', message: err.message || 'Failed to regenerate section' } })
   }
-})
+  }
+)
 
 // GET /api/scripts
-router.get('/', async (req, res) => {
+router.get(
+  '/',
+  validate({
+    query: {
+      niche:    { type: 'string', maxLength: 50, pattern: NICHE_RE },
+      format:   { type: 'string', oneOf: VALID_FORMATS },
+      platform: { type: 'string', maxLength: 50 },
+    },
+  }),
+  async (req, res) => {
   try {
     const { niche, format, platform } = req.query
     const db = await getDb()
@@ -194,10 +212,11 @@ router.get('/', async (req, res) => {
     console.error('[scripts GET /] Error:', err)
     res.status(500).json({ success: false, error: { code: 'FETCH_ERROR', message: err.message || 'Failed to fetch scripts' } })
   }
-})
+  }
+)
 
 // GET /api/scripts/:id
-router.get('/:id', async (req, res) => {
+router.get('/:id', validate({ params: { id: { required: true, type: 'uuid' } } }), async (req, res) => {
   try {
     const { id } = req.params
     const db = await getDb()
@@ -235,16 +254,18 @@ router.get('/:id', async (req, res) => {
 })
 
 // DELETE /api/scripts/:id
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', validate({ params: { id: { required: true, type: 'uuid' } } }), async (req, res) => {
   try {
     const { id } = req.params
     const db = await getDb()
+    // Delete atomically — only succeeds when the script belongs to the caller.
+    // content_kits rows are cleaned up first (no FK cascade in PGlite).
     const check = await db.query('SELECT id FROM scripts WHERE id = $1 AND user_id = $2', [id, req.userId])
     if (!check.rows || check.rows.length === 0) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Script not found' } })
     }
     await db.query('DELETE FROM content_kits WHERE script_id = $1', [id])
-    await db.query('DELETE FROM scripts WHERE id = $1', [id])
+    await db.query('DELETE FROM scripts WHERE id = $1 AND user_id = $2', [id, req.userId])
     res.json({ success: true })
   } catch (err) {
     console.error('[scripts DELETE /:id] Error:', err)
