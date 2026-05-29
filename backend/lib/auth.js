@@ -1,21 +1,27 @@
 import { clerkMiddleware, getAuth } from '@clerk/express'
 import { getDb } from '../db.js'
+import { logger } from './logger.js'
+import { trackFailedAuth } from './limiters.js'
 
-/**
- * Clerk middleware — mounts on server.js to parse auth on every request.
- * Sets req.auth = { userId, sessionId, ... } when valid Clerk JWT present.
- */
+const IS_PROD = process.env.NODE_ENV === 'production'
+
+// Fail fast in production if Clerk is not configured — never silently open the API.
+if (IS_PROD && !process.env.CLERK_SECRET_KEY) {
+  process.stderr.write('[auth] FATAL: CLERK_SECRET_KEY is not set in production. Refusing to start.\n')
+  process.exit(1)
+}
+
 export const clerkMw = clerkMiddleware()
 
 /**
- * requireAuth — verifies user is authenticated and upserts them in DB.
- * Relies on clerkMw having run first (mounted globally in server.js).
+ * requireAuth — verifies Clerk JWT and upserts the user in DB.
+ * In dev, falls back to DEV_USER_ID when Clerk is not configured.
+ * In production, always requires a valid Clerk token.
  */
 export async function requireAuth(req, res, next) {
-  // Dev bypass — no Clerk key configured
   if (!process.env.CLERK_SECRET_KEY) {
-    req.userId = process.env.DEV_USER_ID || 'user-1'
-    req.userEmail = 'alex@trendforge.io'
+    // Dev-only bypass — process.exit above makes this unreachable in production.
+    req.userId = process.env.DEV_USER_ID || 'dev-user-1'
     return next()
   }
 
@@ -23,18 +29,29 @@ export async function requireAuth(req, res, next) {
     const auth = getAuth(req)
 
     if (!auth?.userId) {
-      return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } })
+      const failCount = trackFailedAuth(req.ip)
+      logger.security('auth.rejected', {
+        reason:    'no_token',
+        ip:        req.ip,
+        path:      req.path,
+        method:    req.method,
+        failCount,
+      })
+      return res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
+      })
     }
 
     const clerkUserId = auth.userId
 
-    // Upsert user in DB — use ON CONFLICT (id) since clerk_id unique index
-    // may not exist on old PGlite instances that pre-date that migration.
     try {
       const db = await getDb()
       const existing = await db.query('SELECT id FROM users WHERE clerk_id = $1', [clerkUserId])
+
       if (existing.rows.length > 0) {
         req.userId = existing.rows[0].id
+        logger.info('auth.ok', { userId: req.userId, path: req.path })
       } else {
         const newId = `user-${clerkUserId.replace(/[^a-z0-9]/gi, '').slice(-12)}`
         const fallbackEmail = `${newId}@clerk.user`
@@ -45,26 +62,37 @@ export async function requireAuth(req, res, next) {
           [newId, fallbackEmail, clerkUserId]
         )
         req.userId = newId
+        logger.security('auth.user_created', { userId: newId, ip: req.ip })
       }
     } catch (dbErr) {
-      console.error('[auth] DB upsert error:', dbErr.message)
+      logger.error('auth.db_error', { message: dbErr.message, clerkId: clerkUserId })
+      // Derive a deterministic ID rather than failing the request
       req.userId = `user-${clerkUserId.replace(/[^a-z0-9]/gi, '').slice(-12)}`
     }
 
     req.clerkId = clerkUserId
     next()
   } catch (err) {
-    console.error('[auth] Error:', err.message)
-    return res.status(401).json({ success: false, error: { code: 'INVALID_TOKEN', message: 'Token verification failed' } })
+    const failCount = trackFailedAuth(req.ip)
+    logger.security('auth.token_error', {
+      message:   err.message,
+      ip:        req.ip,
+      path:      req.path,
+      failCount,
+    })
+    return res.status(401).json({
+      success: false,
+      error: { code: 'INVALID_TOKEN', message: 'Token verification failed' },
+    })
   }
 }
 
 export async function optionalAuth(req, res, next) {
   if (!process.env.CLERK_SECRET_KEY) {
-    req.userId = process.env.DEV_USER_ID || 'user-1'
+    req.userId = process.env.DEV_USER_ID || 'dev-user-1'
     return next()
   }
   const auth = getAuth(req)
-  req.userId = auth?.userId || 'anon'
+  req.userId = auth?.userId || null
   next()
 }

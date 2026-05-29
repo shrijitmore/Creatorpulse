@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { NICHES } from '../constants/niches.js'
 import { COLORS } from '../constants/theme.js'
 import { CONTENT_FORMATS, LANGUAGE_STYLES } from '../constants/platforms.js'
-import { updateNiches, updateSettings, refreshTrends, getProfile, updateProfile } from '../lib/api.js'
+import { updateNiches, refreshTrends, getProfile, updateProfile } from '../lib/api.js'
 
 const SECTIONS = [
   { id: 'account',       label: 'Account' },
@@ -14,39 +14,6 @@ const SECTIONS = [
   { id: 'integrations',  label: 'Integrations' },
 ]
 
-function ApiKeyInput({ label, placeholder, fieldKey, value, onChange, docUrl }) {
-  const [show, setShow] = useState(false)
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-        <label style={{ fontSize: 11, fontFamily: 'var(--mono)', letterSpacing: '0.07em', color: 'var(--mute)', textTransform: 'uppercase' }}>{label}</label>
-        {docUrl && (
-          <a href={docUrl} target="_blank" rel="noreferrer"
-            style={{ fontSize: 11.5, color: 'var(--mute)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
-            Get key →
-          </a>
-        )}
-      </div>
-      <div style={{ position: 'relative' }}>
-        <input
-          type={show ? 'text' : 'password'}
-          value={value}
-          onChange={e => onChange(fieldKey, e.target.value)}
-          placeholder={placeholder}
-          autoComplete="off"
-          className="input"
-          style={{ paddingRight: 40, width: '100%', boxSizing: 'border-box' }}
-        />
-        <button
-          onClick={() => setShow(v => !v)}
-          type="button"
-          style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mute)', fontSize: 13 }}>
-          {show ? '○' : '●'}
-        </button>
-      </div>
-    </div>
-  )
-}
 
 function Toggle({ checked, onChange }) {
   return (
@@ -90,17 +57,6 @@ export default function Settings() {
   const [notifDailyDigest, setNotifDailyDigest] = useState(storedNotifs.dailyDigest ?? true)
   const [notifNewTrend, setNotifNewTrend]       = useState(storedNotifs.newTrend ?? false)
   const [notifCoaching, setNotifCoaching]       = useState(storedNotifs.coaching ?? true)
-
-  const storedKeys = useMemo(() => { try { return JSON.parse(localStorage.getItem('trendforge_api_keys') || '{}') } catch { return {} } }, [])
-  const [apiKeys, setApiKeys] = useState({
-    GOOGLE_SERVICE_ACCOUNT_JSON: storedKeys.GOOGLE_SERVICE_ACCOUNT_JSON || '',
-    GOOGLE_CLOUD_PROJECT: storedKeys.GOOGLE_CLOUD_PROJECT || '',
-    APIFY_API_KEY: storedKeys.APIFY_API_KEY || '',
-    REDDIT_CLIENT_ID: storedKeys.REDDIT_CLIENT_ID || '',
-    REDDIT_CLIENT_SECRET: storedKeys.REDDIT_CLIENT_SECRET || '',
-  })
-  const [keysSaving, setKeysSaving] = useState(false)
-  const [keysSaved, setKeysSaved]   = useState(false)
 
   const storedProfile = useMemo(() => { try { return JSON.parse(localStorage.getItem('trendforge_profile') || '{}') } catch { return {} } }, [])
   const name = storedProfile.name || 'Creator'
@@ -158,16 +114,7 @@ export default function Settings() {
     finally { setNicheSaving(false) }
   }
 
-  const updateKey = useCallback((key, value) => { setApiKeys(prev => ({ ...prev, [key]: value })); setKeysSaved(false) }, [])
-
-  const saveKeys = async () => {
-    setKeysSaving(true)
-    try { await updateSettings({ apiKeys }); setKeysSaved(true); setTimeout(() => setKeysSaved(false), 2500) }
-    catch {}
-    finally { setKeysSaving(false) }
-  }
-
-  const scrollTo = (id) => {
+const scrollTo = (id) => {
     setActiveSection(id)
     sectionRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
@@ -378,47 +325,46 @@ export default function Settings() {
           <div className="set-block" ref={el => sectionRefs.current['integrations'] = el} id="integrations">
             <span className="kicker">Integrations</span>
             <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)', marginTop: 4, marginBottom: 4 }}>API Keys</h2>
-            <p className="body">Keys live in <span style={{ fontFamily: 'var(--mono)', fontSize: 12, background: 'var(--paper-2)', padding: '1px 6px', borderRadius: 4, border: '1px solid var(--line)' }}>backend/.env</span> on the server. Reddit scraping works without any key. Instagram requires Apify. AI requires Google Vertex AI.</p>
+            <p className="body">Keys are configured server-side in <span style={{ fontFamily: 'var(--mono)', fontSize: 12, background: 'var(--paper-2)', padding: '1px 6px', borderRadius: 4, border: '1px solid var(--line)' }}>backend/.env</span> and are never stored in the browser. Secrets never leave your server.</p>
 
             <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--paper-2)', border: '1px solid var(--line)', borderRadius: 10, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
               <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>ⓘ</span>
-              <p className="small">Configure keys in <span style={{ fontFamily: 'var(--mono)', fontSize: 11, background: 'var(--paper-3)', padding: '1px 5px', borderRadius: 3 }}>backend/.env</span>. These settings sync to localStorage for reference only.</p>
+              <p className="small">Edit <span style={{ fontFamily: 'var(--mono)', fontSize: 11, background: 'var(--paper-3)', padding: '1px 5px', borderRadius: 3 }}>backend/.env</span> on the server and restart the backend to apply changes. Use a secret manager (e.g. Google Secret Manager, Doppler) in production.</p>
             </div>
 
-            <div style={{ marginTop: 24, paddingBottom: 20, marginBottom: 20, borderBottom: '1px solid var(--line)' }}>
-              <p style={{ fontSize: 11, fontFamily: 'var(--mono)', letterSpacing: '0.07em', color: 'var(--mute)', textTransform: 'uppercase', marginBottom: 14 }}>AI Generation (Vertex AI)</p>
-              <ApiKeyInput label="Google Cloud Project ID" placeholder="your-project-id"
-                fieldKey="GOOGLE_CLOUD_PROJECT" value={apiKeys.GOOGLE_CLOUD_PROJECT} onChange={updateKey}
-                docUrl="https://console.cloud.google.com"/>
-              <ApiKeyInput label="Service Account JSON" placeholder='{"type":"service_account",...}'
-                fieldKey="GOOGLE_SERVICE_ACCOUNT_JSON" value={apiKeys.GOOGLE_SERVICE_ACCOUNT_JSON} onChange={updateKey}
-                docUrl="https://console.cloud.google.com/iam-admin/serviceaccounts"/>
-            </div>
-
-            <div style={{ paddingBottom: 20, marginBottom: 20, borderBottom: '1px solid var(--line)' }}>
-              <p style={{ fontSize: 11, fontFamily: 'var(--mono)', letterSpacing: '0.07em', color: 'var(--mute)', textTransform: 'uppercase', marginBottom: 14 }}>Instagram Scraping</p>
-              <ApiKeyInput label="Apify API Key" placeholder="apify_api_..."
-                fieldKey="APIFY_API_KEY" value={apiKeys.APIFY_API_KEY} onChange={updateKey}
-                docUrl="https://console.apify.com/account/integrations"/>
-            </div>
-
-            <div style={{ paddingBottom: 20, marginBottom: 20, borderBottom: '1px solid var(--line)' }}>
-              <p style={{ fontSize: 11, fontFamily: 'var(--mono)', letterSpacing: '0.07em', color: 'var(--mute)', textTransform: 'uppercase', marginBottom: 14 }}>Reddit API (optional)</p>
-              <ApiKeyInput label="Reddit Client ID" placeholder="your-client-id"
-                fieldKey="REDDIT_CLIENT_ID" value={apiKeys.REDDIT_CLIENT_ID} onChange={updateKey}
-                docUrl="https://www.reddit.com/prefs/apps"/>
-              <ApiKeyInput label="Reddit Client Secret" placeholder="your-client-secret"
-                fieldKey="REDDIT_CLIENT_SECRET" value={apiKeys.REDDIT_CLIENT_SECRET} onChange={updateKey}/>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="status" style={{ fontSize: 0 }}/>
-                <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink-2)', fontFamily: 'var(--mono)', letterSpacing: '0.05em' }}>LIVE MODE</span>
-              </div>
-              <button className="btn btn-primary btn-sm" disabled={keysSaving} onClick={saveKeys}>
-                {keysSaved ? '✓ Saved' : keysSaving ? 'Saving…' : 'Save keys'}
-              </button>
+            <div style={{ marginTop: 24 }}>
+              {[
+                { section: 'AI Generation (Vertex AI)', keys: [
+                  { name: 'GOOGLE_CLOUD_PROJECT',       desc: 'GCP project ID' },
+                  { name: 'GOOGLE_SERVICE_ACCOUNT_JSON', desc: 'Service account JSON (Vertex AI permissions)' },
+                  { name: 'GEMINI_MODEL',                desc: 'Model name, e.g. gemini-2.5-flash' },
+                ]},
+                { section: 'Instagram Scraping', keys: [
+                  { name: 'APIFY_API_KEY',           desc: 'Apify account API key' },
+                  { name: 'INSTAGRAM_SESSION_ID',    desc: 'IG session cookie (alternative to Apify)' },
+                  { name: 'INSTAGRAM_CSRF_TOKEN',    desc: 'IG CSRF token' },
+                ]},
+                { section: 'YouTube + Reddit', keys: [
+                  { name: 'YOUTUBE_API_KEY',     desc: 'YouTube Data API v3 key' },
+                  { name: 'REDDIT_CLIENT_ID',    desc: 'Reddit OAuth app client ID (optional)' },
+                  { name: 'REDDIT_CLIENT_SECRET', desc: 'Reddit OAuth app secret (optional)' },
+                ]},
+                { section: 'Auth + Billing', keys: [
+                  { name: 'CLERK_SECRET_KEY',      desc: 'Clerk backend secret — never expose to frontend' },
+                  { name: 'RAZORPAY_KEY_ID',       desc: 'Razorpay key ID (rzp_live_… in production)' },
+                  { name: 'RAZORPAY_KEY_SECRET',   desc: 'Razorpay webhook secret' },
+                ]},
+              ].map(group => (
+                <div key={group.section} style={{ marginBottom: 24 }}>
+                  <p style={{ fontSize: 11, fontFamily: 'var(--mono)', letterSpacing: '0.07em', color: 'var(--mute)', textTransform: 'uppercase', marginBottom: 10 }}>{group.section}</p>
+                  {group.keys.map(k => (
+                    <div key={k.name} style={{ display: 'flex', alignItems: 'baseline', gap: 12, padding: '7px 0', borderTop: '1px solid var(--line-2)' }}>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--ink)', minWidth: 220, flexShrink: 0 }}>{k.name}</span>
+                      <span style={{ fontSize: 12, color: 'var(--mute)' }}>{k.desc}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
             </div>
           </div>
 

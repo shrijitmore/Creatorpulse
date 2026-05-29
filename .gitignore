@@ -1,18 +1,33 @@
 node_modules
 dist
+
+# ── Secrets — never commit these ──────────────────────────────────────────────
 .env
+.env.*
 *.env
 *.env.local
+*.env.production
+*.env.staging
+**/.env
+**/.env.*
+# Service account JSON if ever saved as a standalone file
+*service_account*.json
+*serviceaccount*.json
 
 # Frontend
 frontend/node_modules
 frontend/dist
-frontend/.env.local
 
 # Backend
-backend/.env
 backend/node_modules
+backend/dev.log
+*.log
 
 # OS
 .DS_Store
 Thumbs.db
+Thumbs.db:encryptable
+
+# IDE
+.vscode/settings.json
+.idea/
