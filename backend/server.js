@@ -54,16 +54,30 @@ if (IS_PROD) {
 
 // ── Security headers (Helmet) ─────────────────────────────────────────────────
 
+// Derive Clerk's instance domain from the publishable key.
+// pk_live_abc123 → clerk.abc123.accounts.dev (production)
+// pk_test_abc123 → clerk.abc123.lcl.dev (development)
+const _clerkKey = process.env.CLERK_PUBLISHABLE_KEY || ''
+const _clerkInstance = (() => {
+  const match = _clerkKey.match(/^pk_(live|test)_([A-Za-z0-9]+)/)
+  if (!match) return null
+  return match[1] === 'live'
+    ? `clerk.${match[2].toLowerCase()}.accounts.dev`
+    : `clerk.${match[2].toLowerCase()}.lcl.dev`
+})()
+const CLERK_DOMAINS = _clerkInstance
+  ? [`https://${_clerkInstance}`, 'https://*.clerk.accounts.dev', 'https://*.clerk.lcl.dev']
+  : ['https://*.clerk.accounts.dev', 'https://*.clerk.lcl.dev']
+
 app.use(helmet({
-  // Allow Clerk's hosted UI assets in CSP
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", 'https://clerk.usable-anchovy-5.clerk.accounts.dev', 'https://*.clerk.accounts.dev'],
-      connectSrc: ["'self'", 'https://*.clerk.accounts.dev', 'https://api.clerk.dev'],
-      frameSrc: ["'self'", 'https://*.clerk.accounts.dev'],
-      imgSrc: ["'self'", 'data:', 'https:'],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc:  ["'self'", "'unsafe-inline'", ...CLERK_DOMAINS],
+      connectSrc: ["'self'", ...CLERK_DOMAINS, 'https://api.clerk.dev'],
+      frameSrc:   ["'self'", ...CLERK_DOMAINS],
+      imgSrc:     ["'self'", 'data:', 'https:'],
+      styleSrc:   ["'self'", "'unsafe-inline'"],
     }
   },
   crossOriginEmbedderPolicy: false,

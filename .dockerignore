@@ -1,0 +1,12 @@
+**/.env
+**/.env.*
+**/node_modules
+**/*.log
+**/.git
+**/dist
+frontend/node_modules
+backend/node_modules
+*service_account*.json
+*serviceaccount*.json
+CLAUDE.md
+.claude/
