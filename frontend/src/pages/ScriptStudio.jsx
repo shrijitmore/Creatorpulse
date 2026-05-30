@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { useScriptGeneration } from '../hooks/useScriptGeneration.js'
+import { useScriptGenerationContext } from '../context/ScriptGenerationContext.jsx'
 import { getMemorySummary, getScript } from '../lib/api.js'
 import SceneEditModal from '../features/studio/SceneEditModal.jsx'
 import RecordingStudio from '../features/studio/RecordingStudio.jsx'
@@ -308,11 +308,17 @@ export default function ScriptStudio() {
   const [recordingOpen, setRecordingOpen] = useState(false)
   const [diffOpen, setDiffOpen] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
-  const [localScript, setLocalScript] = useState(null)
   const [savedScriptLoading, setSavedScriptLoading] = useState(false)
-  const [savedContentKit, setSavedContentKit] = useState(null)
 
-  const { isGenerating, steps, script: generatedScript, contentKit: generatedKit, error, regenerating, generate, cancelGeneration, regenerateContentSection } = useScriptGeneration(topicId)
+  // Global context — generation survives navigation and page-refresh (via localStorage cache)
+  const {
+    isGenerating, steps, script: generatedScript, contentKit: generatedKit,
+    error, regenerating, generate, cancelGeneration, regenerateContentSection,
+    setScript, setContentKit,
+  } = useScriptGenerationContext()
+
+  const [localScript, setLocalScript] = useState(null)
+  const [savedContentKit, setSavedContentKit] = useState(null)
   const script = localScript || generatedScript
   const contentKit = savedContentKit || generatedKit
 
@@ -332,6 +338,7 @@ export default function ScriptStudio() {
   }, [scriptId])
 
   const handleApplyEdit = ({ element, suggestion, scene, cascading }) => {
+    // Apply edits to local override; falls back to the globally-generated script
     setLocalScript(prev => {
       const base = prev || generatedScript
       if (!base) return base

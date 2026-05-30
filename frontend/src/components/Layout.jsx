@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation, Outlet } from 'react-router-dom'
 import { UserButton, useUser, useClerk } from '@clerk/clerk-react'
 import { TrendsProvider } from '../context/TrendsContext.jsx'
+import { ScriptGenerationProvider } from '../context/ScriptGenerationContext.jsx'
 import { COLORS } from '../constants/theme.js'
 import { useRecentScripts } from '../hooks/useRecentScripts.js'
 
@@ -263,6 +264,7 @@ export default function Layout() {
 
   return (
     <TrendsProvider>
+    <ScriptGenerationProvider>
       <div className="app-shell">
         <Sidebar onCommand={() => setPaletteOpen(true)}/>
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: '100vh' }}>
@@ -273,6 +275,7 @@ export default function Layout() {
         </div>
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)}/>
       </div>
+    </ScriptGenerationProvider>
     </TrendsProvider>
   )
 }
