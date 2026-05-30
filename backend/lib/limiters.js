@@ -15,24 +15,18 @@
  * instances share the same counters.
  */
 
-import rateLimit from 'express-rate-limit'
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit'
 import { logger } from './logger.js'
 
 // ── Key generators ────────────────────────────────────────────────────────────
 
-// Normalise IPv4-mapped IPv6 addresses (::ffff:1.2.3.4 → 1.2.3.4) so that
-// express-rate-limit v8's IPv6 guard doesn't flag the key generator.
-function normaliseIp(ip) {
-  if (!ip) return 'unknown'
-  return ip.replace(/^::ffff:/i, '')
-}
-
 // Authenticated endpoints: key by userId so limit is per-account, not per-IP.
-// Falls back to normalised IP for pre-auth routes.
-const byUser = (req) => req.userId || normaliseIp(req.ip)
+// Falls back to express-rate-limit's ipKeyGenerator for pre-auth routes —
+// required in v8 so IPv6 addresses are handled correctly.
+const byUser = (req) => req.userId || ipKeyGenerator(req)
 
-// Pre-auth endpoints: key by normalised IP.
-const byIp = (req) => normaliseIp(req.ip)
+// Pre-auth endpoints: key by IP using the v8 helper.
+const byIp = (req) => ipKeyGenerator(req)
 
 // ── Shared handler factory ────────────────────────────────────────────────────
 
