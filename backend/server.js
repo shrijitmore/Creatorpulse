@@ -73,13 +73,15 @@ app.use(helmet({
 
 const ALLOWED_ORIGINS = IS_PROD
   ? (process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : [])
-  : ['http://localhost:8080', 'http://localhost:5173', 'http://127.0.0.1:8080']
+  : null  // dev: checked dynamically below
 
 app.use(cors({
   origin: (origin, cb) => {
     // Allow server-to-server requests (no origin) only in dev
     if (!origin) return cb(null, !IS_PROD)
-    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true)
+    // Dev: allow any localhost or 127.0.0.1 on any port so Vite port-shifting never breaks the app
+    if (!IS_PROD && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return cb(null, true)
+    if (IS_PROD && ALLOWED_ORIGINS?.includes(origin)) return cb(null, true)
     cb(new Error(`CORS: origin '${origin}' not allowed`))
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
