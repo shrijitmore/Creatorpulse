@@ -22,6 +22,7 @@ function EngagementInput({ scriptId, onSave }) {
   const [score, setScore] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+
   const handleSave = async () => {
     if (!score) return
     setSaving(true)
@@ -36,19 +37,25 @@ function EngagementInput({ scriptId, onSave }) {
     } catch {}
     finally { setSaving(false) }
   }
-  if (saved) return <span className="chip" style={{ fontSize: 10.5 }}>✓ Posted</span>
+
+  if (saved) return (
+    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--success)', background: 'var(--successsoft)', padding: '3px 10px', borderRadius: 999, border: '1px solid var(--success)' }}>
+      ✓ Posted
+    </span>
+  )
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} onClick={e => e.stopPropagation()}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={e => e.stopPropagation()}>
       <input
         type="number" min="0" max="100" value={score}
         onChange={e => setScore(e.target.value)}
-        className="input"
-        style={{ width: 64, height: 32, padding: '0 8px', fontSize: 13, textAlign: 'center' }}
-        placeholder="0–100"/>
+        style={{ width: 56, height: 28, padding: '0 8px', fontSize: 12, textAlign: 'center', border: '1px solid var(--line)', borderRadius: 6, fontFamily: 'var(--mono)', outline: 'none' }}
+        placeholder="0–100"
+      />
       <button
         onClick={handleSave} disabled={!score || saving}
-        className="btn btn-line btn-sm">
-        {saving ? '…' : 'Mark used'}
+        style={{ height: 28, padding: '0 10px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--ink)', color: '#fff', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', opacity: (!score || saving) ? 0.5 : 1 }}>
+        {saving ? '…' : 'Save'}
       </button>
     </div>
   )
@@ -57,56 +64,126 @@ function EngagementInput({ scriptId, onSave }) {
 function ScriptRow({ script, onDelete, onOpen }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [showEngagement, setShowEngagement] = useState(false)
+  const [hovered, setHovered] = useState(false)
   const niche = NICHES.find(n => n.id === script.niche)
-  const statusClass = script.wasUsed ? 'shipped' : 'draft'
+  const isPosted = script.wasUsed
 
   return (
     <div
-      className={`saved-row ${statusClass}`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => { setHovered(false); setConfirmDelete(false) }}
       onClick={() => onOpen(script)}
-      onMouseLeave={() => setConfirmDelete(false)}>
-      <span className="rk">{NICHE_ICON[script.niche] || '📝'}</span>
-      <div>
-        <p className="tt">{script.topicTitle}</p>
-        <p className="tag" style={{ marginTop: 3 }}>{niche?.label || script.niche}</p>
-      </div>
-      <div className="pf">
-        <span className="dot"/>
-        {script.wasUsed ? 'Posted' : 'Draft'}
-        {script.engagementScore && <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink)' }}>{script.engagementScore}</span>}
-      </div>
-      {showEngagement
-        ? <EngagementInput scriptId={script.id} onSave={() => setShowEngagement(false)}/>
-        : <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--mute)', padding: '4px 10px', border: '1px solid var(--line)', borderRadius: 999 }}>{script.format} reel</span>}
-      <span className="tag" style={{ fontFamily: 'var(--mono)', textAlign: 'right' }}>{timeAgo(script.createdAt)}</span>
+      style={{
+        display: 'flex', alignItems: 'center', gap: 16,
+        padding: '14px 16px',
+        borderRadius: 12,
+        border: '1px solid var(--line)',
+        background: hovered ? 'var(--paper-2)' : 'var(--paper)',
+        cursor: 'pointer',
+        transition: 'background .15s, border-color .15s',
+        borderColor: hovered ? 'var(--ink-2)' : 'var(--line)',
+      }}>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} onClick={e => e.stopPropagation()}>
-        <button
-          title="Mark as posted"
-          onClick={() => setShowEngagement(v => !v)}
-          style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--line)', background: 'var(--paper-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, cursor: 'pointer' }}>
-          ★
-        </button>
+      {/* Niche icon */}
+      <div style={{
+        width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+        background: 'var(--paper-3)', border: '1px solid var(--line)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+      }}>
+        {NICHE_ICON[script.niche] || '📝'}
+      </div>
+
+      {/* Title + niche */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{
+          fontSize: 14, fontWeight: 500, color: 'var(--ink)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3,
+        }}>
+          {script.topicTitle}
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--mute)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            {niche?.label || script.niche}
+          </span>
+          <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--line)' }}/>
+          <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--mute)' }}>
+            {script.tone}
+          </span>
+        </div>
+      </div>
+
+      {/* Status badge */}
+      <div style={{ flexShrink: 0 }}>
+        {isPosted ? (
+          <span style={{
+            fontSize: 11, fontWeight: 600,
+            color: 'var(--success)', background: 'var(--successsoft)',
+            padding: '3px 10px', borderRadius: 999, border: '1px solid var(--success)',
+          }}>Posted</span>
+        ) : (
+          <span style={{
+            fontSize: 11, fontWeight: 500,
+            color: 'var(--mute)', background: 'var(--paper-3)',
+            padding: '3px 10px', borderRadius: 999, border: '1px solid var(--line)',
+          }}>Draft</span>
+        )}
+        {script.engagementScore != null && (
+          <span style={{ marginLeft: 6, fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--ink)', fontWeight: 600 }}>
+            {script.engagementScore}
+          </span>
+        )}
+      </div>
+
+      {/* Format pill */}
+      <span style={{
+        flexShrink: 0, fontSize: 11, fontFamily: 'var(--mono)',
+        color: 'var(--ink-2)', background: 'var(--paper-2)',
+        padding: '4px 10px', borderRadius: 6, border: '1px solid var(--line)',
+      }}>
+        {script.format}
+      </span>
+
+      {/* Time */}
+      <span style={{ flexShrink: 0, fontSize: 11.5, fontFamily: 'var(--mono)', color: 'var(--mute)', width: 60, textAlign: 'right' }}>
+        {timeAgo(script.createdAt)}
+      </span>
+
+      {/* Actions */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+        {showEngagement ? (
+          <EngagementInput scriptId={script.id} onSave={() => setShowEngagement(false)}/>
+        ) : (
+          <button
+            title="Mark as posted"
+            onClick={() => setShowEngagement(v => !v)}
+            style={actionBtn(isPosted ? 'var(--success)' : undefined)}>
+            ★
+          </button>
+        )}
         <button
           title="Open in Studio"
           onClick={() => onOpen(script)}
-          style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--line)', background: 'var(--paper-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, cursor: 'pointer' }}>
+          style={actionBtn()}>
           →
         </button>
         <div style={{ position: 'relative' }}>
           <button
             title="Delete"
             onClick={() => setConfirmDelete(v => !v)}
-            style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--line)', background: 'var(--paper-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, cursor: 'pointer', color: 'var(--mute)' }}>
+            style={actionBtn('var(--error-muted, #c04a2e)')}>
             ×
           </button>
           {confirmDelete && (
-            <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 50, background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 10, padding: 12, width: 160, boxShadow: 'var(--sh-pop)' }}>
-              <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink)', marginBottom: 10 }}>Delete this script?</p>
+            <div style={{
+              position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 100,
+              background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 12,
+              padding: 14, width: 170, boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+            }}>
+              <p style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--ink)', marginBottom: 10 }}>Delete this script?</p>
               <div style={{ display: 'flex', gap: 6 }}>
                 <button
                   onClick={() => { setConfirmDelete(false); onDelete(script.id) }}
-                  style={{ flex: 1, padding: '6px 0', borderRadius: 8, background: 'rgba(192,74,46,0.1)', border: '1px solid rgba(192,74,46,0.2)', color: 'rgb(192,74,46)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+                  style={{ flex: 1, padding: '6px 0', borderRadius: 8, background: 'rgba(192,74,46,0.1)', border: '1px solid rgba(192,74,46,0.3)', color: 'rgb(192,74,46)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                   Delete
                 </button>
                 <button
@@ -121,6 +198,16 @@ function ScriptRow({ script, onDelete, onOpen }) {
       </div>
     </div>
   )
+}
+
+function actionBtn(color) {
+  return {
+    width: 30, height: 30, borderRadius: 8,
+    border: '1px solid var(--line)', background: 'var(--paper)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 13, cursor: 'pointer', color: color || 'var(--ink-2)',
+    transition: 'background .12s',
+  }
 }
 
 function PerformanceFeedback({ scripts }) {
@@ -141,29 +228,31 @@ function PerformanceFeedback({ scripts }) {
     .map(([tone, scores]) => ({ tone, avg: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) }))
     .sort((a, b) => b.avg - a.avg)
 
+  const stats = [
+    { label: 'Scripts posted', value: posted.length },
+    { label: 'With score', value: withScore.length },
+    { label: 'Avg score', value: avgScore != null ? `${avgScore}/100` : '—' },
+    { label: 'Best tone', value: toneAvgs[0]?.tone || '—' },
+  ]
+
   return (
-    <div className="card" style={{ borderLeft: '3px solid var(--ink)', marginBottom: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+    <div style={{ marginBottom: 24, padding: 20, borderRadius: 14, border: '1px solid var(--line)', borderLeft: '3px solid var(--ink)', background: 'var(--paper)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
         <span style={{ fontSize: 14 }}>⚡</span>
-        <p style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)' }}>Performance feedback loop</p>
-        <span className="chip" style={{ fontSize: 10 }}>{posted.length} posted</span>
+        <p style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)' }}>Performance loop</p>
+        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--mute)', background: 'var(--paper-3)', padding: '2px 8px', borderRadius: 999, border: '1px solid var(--line)' }}>{posted.length} posted</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 14 }}>
-        {[
-          { label: 'Scripts posted', value: posted.length },
-          { label: 'With score', value: withScore.length },
-          { label: 'Avg score', value: avgScore != null ? `${avgScore}/100` : '—' },
-          { label: 'Best tone', value: toneAvgs[0]?.tone || '—' },
-        ].map(s => (
-          <div key={s.label} style={{ padding: '10px 14px', border: '1px solid var(--line)', borderRadius: 10, textAlign: 'center' }}>
-            <p style={{ fontSize: 20, fontWeight: 600, color: 'var(--ink)', lineHeight: 1 }}>{s.value}</p>
-            <span className="label" style={{ marginBottom: 0, marginTop: 4 }}>{s.label}</span>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
+        {stats.map(s => (
+          <div key={s.label} style={{ padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 10, textAlign: 'center', background: 'var(--paper-2)' }}>
+            <p style={{ fontSize: 18, fontWeight: 600, color: 'var(--ink)', lineHeight: 1 }}>{s.value}</p>
+            <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--mute)', fontWeight: 500, marginTop: 4, display: 'block' }}>{s.label}</span>
           </div>
         ))}
       </div>
       {toneAvgs[0] && (
-        <p className="body" style={{ fontSize: 12.5 }}>
-          ✦ <strong>{toneAvgs[0].tone}</strong> tone gets your highest scores ({toneAvgs[0].avg} avg)
+        <p style={{ fontSize: 12.5, color: 'var(--ink-2)', marginTop: 12 }}>
+          ✦ <strong style={{ color: 'var(--ink)' }}>{toneAvgs[0].tone}</strong> tone gets your highest scores ({toneAvgs[0].avg} avg)
         </p>
       )}
     </div>
@@ -211,6 +300,20 @@ export default function SavedScripts() {
 
   const hasFilters = search || filterNiche !== 'all' || filterFormat !== 'all'
 
+  const skeletonRows = Array.from({ length: 4 }).map((_, i) => (
+    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 16px', borderRadius: 12, border: '1px solid var(--line)', background: 'var(--paper)' }}>
+      <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--paper-3)', flexShrink: 0 }}/>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ height: 13, width: '60%', background: 'var(--paper-3)', borderRadius: 4 }}/>
+        <div style={{ height: 10, width: '30%', background: 'var(--paper-3)', borderRadius: 4 }}/>
+      </div>
+      <div style={{ height: 22, width: 50, background: 'var(--paper-3)', borderRadius: 999 }}/>
+      <div style={{ height: 22, width: 36, background: 'var(--paper-3)', borderRadius: 6 }}/>
+      <div style={{ height: 12, width: 48, background: 'var(--paper-3)', borderRadius: 4 }}/>
+      <div style={{ height: 30, width: 94, background: 'var(--paper-3)', borderRadius: 8 }}/>
+    </div>
+  ))
+
   return (
     <div className="app-main">
       {/* Header */}
@@ -218,7 +321,7 @@ export default function SavedScripts() {
         <div>
           <span className="kicker">Archive</span>
           <h1 style={{ fontSize: 24, fontWeight: 500, letterSpacing: '-0.02em', color: 'var(--ink)', marginTop: 6 }}>Library</h1>
-          <p className="body" style={{ marginTop: 4 }}>Every saved script, sorted, tagged, ready to reopen in the studio.</p>
+          <p className="body" style={{ marginTop: 4 }}>Every saved script, sorted and ready to reopen in the studio.</p>
         </div>
         <button className="btn btn-primary btn-sm" onClick={() => navigate('/dashboard')}>+ New from dashboard</button>
       </div>
@@ -226,15 +329,12 @@ export default function SavedScripts() {
       {!loading && scripts.length > 0 && <PerformanceFeedback scripts={scripts}/>}
 
       {/* Filters */}
-      <div className="app-filters">
-        <div style={{ position: 'relative', flex: '1 1 180px', maxWidth: 300 }}>
+      <div className="app-filters" style={{ marginBottom: 16 }}>
+        <div style={{ position: 'relative', flex: '1 1 180px', maxWidth: 280 }}>
           <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--mute-2)', fontSize: 13, pointerEvents: 'none' }}>⌕</span>
           <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search scripts…"
-            className="input"
+            type="text" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search scripts…" className="input"
             style={{ paddingLeft: 34, height: 36 }}
           />
         </div>
@@ -255,54 +355,37 @@ export default function SavedScripts() {
             <option value="title">A → Z</option>
           </select>
           {hasFilters && (
-            <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(''); setFilterNiche('all'); setFilterFormat('all') }}>
-              Clear ×
-            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(''); setFilterNiche('all'); setFilterFormat('all') }}>Clear ×</button>
           )}
         </div>
       </div>
 
       {!loading && scripts.length > 0 && (
-        <p className="small" style={{ marginBottom: 12 }}>
+        <p style={{ fontSize: 12, color: 'var(--mute)', marginBottom: 12 }}>
           Showing <strong style={{ color: 'var(--ink)' }}>{filtered.length}</strong> of {scripts.length} scripts
         </p>
       )}
 
-      {/* List header */}
-      {!loading && filtered.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 200px 160px 160px 40px', gap: 16, padding: '0 0 10px', borderBottom: '1px solid var(--line)', marginBottom: 0 }}>
-          {['#', 'Title', 'Performance', 'Format', 'When', ''].map(h => (
-            <span key={h} className="label" style={{ marginBottom: 0, fontSize: 10 }}>{h}</span>
-          ))}
-        </div>
-      )}
-
       {/* Script list */}
-      <div className="saved-list">
-        {loading ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} style={{ display: 'grid', gridTemplateColumns: '60px 1fr 200px 160px 160px 40px', gap: 16, padding: '16px 0', borderBottom: '1px solid var(--line-2)' }}>
-              {[36, 200, 100, 80, 60, 30].map((w, j) => (
-                <div key={j} style={{ height: 14, width: '100%', background: 'var(--paper-3)', borderRadius: 4, animation: 'none', opacity: 0.5 }}/>
-              ))}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {loading ? skeletonRows
+          : filtered.length === 0 ? (
+            <div style={{ padding: '56px 16px', textAlign: 'center', border: '1px dashed var(--line)', borderRadius: 14 }}>
+              <div style={{ fontSize: 28, marginBottom: 12, opacity: 0.25 }}>⊟</div>
+              <p style={{ fontSize: 16, fontWeight: 500, color: 'var(--ink)', marginBottom: 8 }}>
+                {hasFilters ? 'No matches' : 'No saved scripts yet'}
+              </p>
+              <p className="body" style={{ marginBottom: 20 }}>
+                {hasFilters ? 'Try adjusting your filters.' : 'Generate your first script from a trending topic.'}
+              </p>
+              {!hasFilters && (
+                <button className="btn btn-primary" onClick={() => navigate('/dashboard')}>✦ Discover trends</button>
+              )}
             </div>
-          ))
-        ) : filtered.length === 0 ? (
-          <div style={{ padding: '56px 16px', textAlign: 'center', borderTop: '1px solid var(--line)' }}>
-            <div style={{ fontSize: 24, marginBottom: 12, opacity: 0.3 }}>⊟</div>
-            <p style={{ fontSize: 16, fontWeight: 500, color: 'var(--ink)', marginBottom: 8 }}>{hasFilters ? 'No matches' : 'No saved scripts yet'}</p>
-            <p className="body" style={{ marginBottom: 20 }}>
-              {hasFilters ? 'Try adjusting your filters.' : 'Generate your first script from a trending topic.'}
-            </p>
-            {!hasFilters && (
-              <button className="btn btn-primary" onClick={() => navigate('/dashboard')}>✦ Discover trends</button>
-            )}
-          </div>
-        ) : (
-          filtered.map(script => (
+          ) : filtered.map(script => (
             <ScriptRow key={script.id} script={script} onDelete={handleDelete} onOpen={handleOpen}/>
           ))
-        )}
+        }
       </div>
     </div>
   )
