@@ -71,18 +71,32 @@ export async function interpretNiche(query) {
     }
   }
 
-  const model = createGeminiModel({ temperature: 0.3, maxOutputTokens: 600 })
-  const response = await model.invoke([
-    { role: 'system', content: SYSTEM_PROMPT },
-    { role: 'user', content: `My content niche: "${query.trim()}"` },
-  ])
+  try {
+    const model = createGeminiModel({ temperature: 0.3, maxOutputTokens: 600 })
+    const response = await model.invoke([
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: `My content niche: "${query.trim()}"` },
+    ])
 
-  const text = extractResponseText(response)
-  const parsed = extractJson(text)
+    const text = extractResponseText(response)
+    const parsed = extractJson(text)
 
-  if (!parsed || typeof parsed.understood !== 'boolean') {
-    throw new Error('Unexpected AI response format')
+    if (!parsed || typeof parsed.understood !== 'boolean') {
+      throw new Error('Unexpected AI response format')
+    }
+
+    return parsed
+  } catch (err) {
+    console.error('[nicheService] Gemini failed, using slug fallback:', err.message)
+    const slug = query.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+    return {
+      understood: true,
+      nicheId: slug,
+      nicheLabel: query.trim(),
+      hashtags: [slug, ...slug.split('-')].filter(Boolean).slice(0, 5),
+      subreddits: [slug],
+      ytQuery: `${query.trim()} tips guide`,
+      isPreset: false,
+    }
   }
-
-  return parsed
 }

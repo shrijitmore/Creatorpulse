@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getProfile, resetOnboarding } from '../lib/api.js'
 import AudienceAgeEditor from '../features/profile/AudienceAgeEditor.jsx'
 import DeliveryGrowth from '../features/profile/DeliveryGrowth.jsx'
+import EditProfileModal from '../features/profile/EditProfileModal.jsx'
 
 const VOICE_AXIS_KEYS = ['energy', 'formality', 'emotion', 'controversy', 'storytelling', 'humor']
 const VOICE_AXIS_LABELS = { energy: 'Energy', formality: 'Formality', emotion: 'Emotion', controversy: 'Controversy', storytelling: 'Storytelling', humor: 'Humor' }
@@ -75,6 +76,7 @@ export default function Profile() {
   const [error, setError] = useState(null)
   const [audienceAge, setAudienceAge] = useState(null)
   const [recalibrating, setRecalibrating] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
 
   const handleRecalibrate = async () => {
     setRecalibrating(true)
@@ -147,7 +149,7 @@ export default function Profile() {
           <button className="btn btn-line btn-sm" onClick={handleRecalibrate} disabled={recalibrating}>
             {recalibrating ? '↻ Resetting…' : '↻ Recalibrate'}
           </button>
-          <button className="btn btn-line btn-sm" onClick={() => navigate('/settings')}>✎ Edit profile</button>
+          <button className="btn btn-line btn-sm" onClick={() => setEditOpen(true)}>✎ Edit profile</button>
           <button className="btn btn-primary btn-sm" onClick={() => navigate('/dashboard')}>Open dashboard →</button>
         </div>
       </div>
@@ -163,7 +165,7 @@ export default function Profile() {
               {profile?.onboardingDone
                 ? <span className="chip active" style={{ fontSize: 10 }}>Voice trained</span>
                 : <span className="chip" style={{ fontSize: 10 }}>Setup incomplete</span>}
-              <span className="chip" style={{ fontSize: 10 }}>Free tier</span>
+              <span className="chip" style={{ fontSize: 10 }}>{data?.plan ? `${data.plan.charAt(0).toUpperCase()}${data.plan.slice(1)} plan` : 'Free plan'}</span>
             </div>
           </div>
         </div>
@@ -399,6 +401,12 @@ export default function Profile() {
         </div>
       </div>
 
+      <EditProfileModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        profile={profile}
+        onSaved={() => { setEditOpen(false); loadProfile() }}
+      />
     </div>
   )
 }

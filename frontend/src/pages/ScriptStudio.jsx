@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useScriptGeneration } from '../hooks/useScriptGeneration.js'
-import { getMemorySummary } from '../lib/api.js'
+import { getMemorySummary, getScript } from '../lib/api.js'
 import SceneEditModal from '../features/studio/SceneEditModal.jsx'
 import RecordingStudio from '../features/studio/RecordingStudio.jsx'
 import ScriptDiff from '../features/studio/ScriptDiff.jsx'
@@ -297,20 +297,39 @@ export default function ScriptStudio() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
 
+  const scriptId   = searchParams.get('scriptId') || ''
   const topicId    = searchParams.get('topicId') || ''
   const topicTitle = searchParams.get('title') ? decodeURIComponent(searchParams.get('title')) : ''
   const topicNiche = searchParams.get('niche') ? decodeURIComponent(searchParams.get('niche')) : 'general'
 
   const [tone, setTone]     = useState('Storytelling')
   const [format, setFormat] = useState('60s')
-  const [saved, setSaved]   = useState(false)
+  const [saved, setSaved]   = useState(!!scriptId)  // already saved if opened from library
   const [recordingOpen, setRecordingOpen] = useState(false)
   const [diffOpen, setDiffOpen] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
   const [localScript, setLocalScript] = useState(null)
+  const [savedScriptLoading, setSavedScriptLoading] = useState(false)
+  const [savedContentKit, setSavedContentKit] = useState(null)
 
-  const { isGenerating, steps, script: generatedScript, contentKit, error, regenerating, generate, cancelGeneration, regenerateContentSection } = useScriptGeneration(topicId)
+  const { isGenerating, steps, script: generatedScript, contentKit: generatedKit, error, regenerating, generate, cancelGeneration, regenerateContentSection } = useScriptGeneration(topicId)
   const script = localScript || generatedScript
+  const contentKit = savedContentKit || generatedKit
+
+  // Load saved script by ID (from SavedScripts page) — skip auto-generation
+  useEffect(() => {
+    if (!scriptId) return
+    setSavedScriptLoading(true)
+    getScript(scriptId)
+      .then(data => {
+        setLocalScript(data)
+        if (data.contentKit) setSavedContentKit(data.contentKit)
+        if (data.tone) setTone(data.tone.charAt(0).toUpperCase() + data.tone.slice(1))
+        if (data.format) setFormat(data.format)
+      })
+      .catch(() => {})
+      .finally(() => setSavedScriptLoading(false))
+  }, [scriptId])
 
   const handleApplyEdit = ({ element, suggestion, scene, cascading }) => {
     setLocalScript(prev => {
@@ -336,10 +355,11 @@ export default function ScriptStudio() {
   }
 
   useEffect(() => {
+    if (scriptId) return  // loading a saved script — don't auto-generate
     if (topicId && !script && !isGenerating) generate(topicId, topicTitle, topicNiche, tone.toLowerCase(), format)
   }, [])
 
-  if (!topicId && !script) {
+  if (!topicId && !scriptId && !script) {
     return (
       <div className="app-main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 56px)' }}>
         <div style={{ textAlign: 'center', maxWidth: 360 }}>
@@ -399,8 +419,8 @@ export default function ScriptStudio() {
         {script && (
           <button
             className={`btn btn-sm ${saved ? 'btn-line' : 'btn-primary'}`}
-            onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 2500) }}>
-            {saved ? '✓ Saved' : 'Save to library'}
+            onClick={() => { setSaved(true); setTimeout(() => navigate('/saved'), 800) }}>
+            {saved ? '✓ In library' : 'Save to library'}
           </button>
         )}
       </div>
@@ -409,6 +429,14 @@ export default function ScriptStudio() {
       {error && (
         <div style={{ marginBottom: 20, padding: '12px 16px', background: 'rgba(192,74,46,0.08)', border: '1px solid rgba(192,74,46,0.2)', borderRadius: 10, fontSize: 13, color: 'rgb(192,74,46)' }}>
           ⚠ {error}
+        </div>
+      )}
+
+      {/* Loading saved script */}
+      {savedScriptLoading && (
+        <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', border: '1px solid var(--line)', borderRadius: 10, background: 'var(--paper-2)' }}>
+          <span style={{ display: 'flex', gap: 3 }}><span className="tdot"/><span className="tdot"/><span className="tdot"/></span>
+          <span style={{ fontSize: 13, color: 'var(--ink2)' }}>Loading saved script…</span>
         </div>
       )}
 

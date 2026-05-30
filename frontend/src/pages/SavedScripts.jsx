@@ -195,7 +195,7 @@ export default function SavedScripts() {
   }, [])
 
   const handleOpen = useCallback((script) => {
-    navigate(`/studio?topicId=${script.topicId || script.id}&title=${encodeURIComponent(script.topicTitle)}&niche=${encodeURIComponent(script.niche || '')}`)
+    navigate(`/studio?scriptId=${script.id}&topicId=${script.topicId || script.id}&title=${encodeURIComponent(script.topicTitle)}&niche=${encodeURIComponent(script.niche || '')}`)
   }, [navigate])
 
   const filtered = useMemo(() => {
