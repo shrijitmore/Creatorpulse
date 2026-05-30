@@ -40,19 +40,25 @@ export function ScriptGenerationProvider({ children }) {
     setSteps(prev => prev.map(s => s.step === stepNum ? { ...s, status } : s))
   }, [])
 
-  const generate = useCallback((tid, topicTitle, niche, tone, format) => {
+  const generate = useCallback((tid, topicTitle, niche, tone, format, { force = false } = {}) => {
     if (cancelRef.current) cancelRef.current()
 
-    // Check localStorage cache first (survives page refresh for same topic)
-    const cached = loadFromStorage(tid)
-    if (cached?.script) {
-      setActiveTopicId(tid)
-      setScript(cached.script)
-      setContentKit(cached.contentKit)
-      setIsGenerating(false)
-      setSteps(INITIAL_STEPS.map(s => ({ ...s, status: 'done' })))
-      return
+    // Check localStorage cache first (survives page refresh for same topic).
+    // force=true skips cache — used by Re-forge to always produce a new script.
+    if (!force) {
+      const cached = loadFromStorage(tid)
+      if (cached?.script) {
+        setActiveTopicId(tid)
+        setScript(cached.script)
+        setContentKit(cached.contentKit)
+        setIsGenerating(false)
+        setSteps(INITIAL_STEPS.map(s => ({ ...s, status: 'done' })))
+        return
+      }
     }
+
+    // Clear stale cache so the new result overwrites it
+    try { localStorage.removeItem(LS_KEY) } catch {}
 
     setActiveTopicId(tid)
     setIsGenerating(true)
@@ -118,12 +124,16 @@ export function ScriptGenerationProvider({ children }) {
     finally { setRegenerating(prev => ({ ...prev, [section]: false })) }
   }, [script, activeTopicId])
 
+  const reforge = useCallback((tid, topicTitle, niche, tone, format) => {
+    generate(tid, topicTitle, niche, tone, format, { force: true })
+  }, [generate])
+
   const value = useMemo(() => ({
     activeTopicId, isGenerating, steps, script, contentKit, error, regenerating,
-    generate, cancelGeneration, reset, regenerateContentSection,
+    generate, reforge, cancelGeneration, reset, regenerateContentSection,
     setScript, setContentKit,
   }), [activeTopicId, isGenerating, steps, script, contentKit, error, regenerating,
-      generate, cancelGeneration, reset, regenerateContentSection])
+      generate, reforge, cancelGeneration, reset, regenerateContentSection])
 
   return <ScriptGenerationContext.Provider value={value}>{children}</ScriptGenerationContext.Provider>
 }

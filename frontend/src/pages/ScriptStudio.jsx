@@ -313,7 +313,7 @@ export default function ScriptStudio() {
   // Global context — generation survives navigation and page-refresh (via localStorage cache)
   const {
     isGenerating, steps, script: generatedScript, contentKit: generatedKit,
-    error, regenerating, generate, cancelGeneration, regenerateContentSection,
+    error, regenerating, generate, reforge, cancelGeneration, regenerateContentSection,
     setScript, setContentKit,
   } = useScriptGenerationContext()
 
@@ -422,7 +422,7 @@ export default function ScriptStudio() {
         {localScript && generatedScript && (
           <button className="btn btn-line btn-sm" onClick={() => setDiffOpen(true)}>Changes</button>
         )}
-        <button className="btn btn-line btn-sm" onClick={() => generate(topicId, topicTitle, topicNiche, tone.toLowerCase(), format)}>↻ Re-forge</button>
+        <button className="btn btn-line btn-sm" onClick={() => reforge(topicId, topicTitle, topicNiche, tone.toLowerCase(), format)}>↻ Re-forge</button>
         {script && (
           <button
             className={`btn btn-sm ${saved ? 'btn-line' : 'btn-primary'}`}
