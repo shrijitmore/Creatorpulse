@@ -59,6 +59,14 @@ export default function Checkout() {
       const order = await createBillingOrder({ planId, cycle, coupon: couponApplied ? coupon : '' })
 
       if (order.simulated) {
+        // Dev/test mode — no Razorpay keys. Still call verify so the plan is
+        // saved to the database (signature check is skipped server-side).
+        try {
+          await verifyBillingPayment({
+            orderId: order.orderId, paymentId: order.paymentId,
+            signature: order.signature, planId, cycle,
+          })
+        } catch {}
         navigate(`/plans/success?plan=${planId}`)
         return
       }

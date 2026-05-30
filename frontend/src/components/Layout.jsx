@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Outlet } from 'react-router-dom'
 import { UserButton, useUser, useClerk } from '@clerk/clerk-react'
 import { TrendsProvider } from '../context/TrendsContext.jsx'
 import { ScriptGenerationProvider } from '../context/ScriptGenerationContext.jsx'
+import { getProfile } from '../lib/api.js'
 import { COLORS } from '../constants/theme.js'
 import { useRecentScripts } from '../hooks/useRecentScripts.js'
 
@@ -127,6 +128,15 @@ function Sidebar({ onCommand }) {
 
   const recentScripts = useRecentScripts(3)
 
+  const [planInfo, setPlanInfo] = useState({ plan: 'free', totalScripts: 0 })
+  useEffect(() => {
+    let cancelled = false
+    getProfile()
+      .then(d => { if (!cancelled) setPlanInfo({ plan: d?.plan || 'free', totalScripts: d?.stats?.totalScripts || 0 }) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [location.pathname])
+
   return (
     <aside className="side">
       {/* Brand */}
@@ -181,14 +191,20 @@ function Sidebar({ onCommand }) {
 
       {/* Footer */}
       <div className="side-foot">
-        {/* Upgrade block */}
-        <div className="side-up">
-          <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink)', marginBottom: 4 }}>Upgrade to Pro</p>
-          <p className="small" style={{ marginBottom: 12 }}>Unlimited scripts, voice training, team workspace.</p>
-          <div className="side-bar"><i style={{ width: '20%' }}/></div>
-          <p className="small" style={{ marginTop: 6 }}>1 of 5 scripts used</p>
-          <button className="btn btn-primary btn-sm" style={{ width: '100%', justifyContent: 'center', marginTop: 12 }}>Upgrade</button>
-        </div>
+        {/* Upgrade block — only for free plan */}
+        {planInfo.plan === 'free' && (
+          <div className="side-up">
+            <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink)', marginBottom: 4 }}>Upgrade to Pro</p>
+            <p className="small" style={{ marginBottom: 12 }}>Unlimited scripts, voice training, team workspace.</p>
+            <div className="side-bar">
+              <i style={{ width: `${Math.min(100, (planInfo.totalScripts / 5) * 100)}%` }}/>
+            </div>
+            <p className="small" style={{ marginTop: 6 }}>{planInfo.totalScripts} of 5 scripts used</p>
+            <button className="btn btn-primary btn-sm" style={{ width: '100%', justifyContent: 'center', marginTop: 12 }} onClick={() => navigate('/plans')}>
+              Upgrade
+            </button>
+          </div>
+        )}
 
         {/* User */}
         <div className="side-user" onClick={() => navigate('/profile')} style={{ cursor: 'pointer' }}>

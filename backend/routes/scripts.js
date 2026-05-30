@@ -11,6 +11,52 @@ import { aiGenerationLimiter, aiAssistLimiter, requireBrowserLike } from '../lib
 import { validate, sanitizeText, VALID_TONES, VALID_FORMATS, VALID_SECTIONS, NICHE_RE } from '../lib/validate.js'
 
 const router = Router()
+const FREE_SCRIPT_LIMIT = 5
+
+// Middleware: enforce free-tier quota + auto-expire paid plans
+async function checkPlanLimit(req, res, next) {
+  try {
+    const db = await getDb()
+    const result = await db.query(
+      'SELECT plan, plan_expires_at FROM users WHERE id = $1',
+      [req.userId]
+    )
+    const user = result.rows[0]
+    if (!user) return next()
+
+    let plan = user.plan || 'free'
+
+    // Auto-downgrade expired paid plan to free
+    if (plan !== 'free' && user.plan_expires_at && new Date(user.plan_expires_at) < new Date()) {
+      plan = 'free'
+      await db.query('UPDATE users SET plan = $1 WHERE id = $2', ['free', req.userId]).catch(() => {})
+    }
+
+    // Free tier: cap at FREE_SCRIPT_LIMIT scripts per calendar month
+    if (plan === 'free') {
+      const monthStart = new Date()
+      monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+      const countRes = await db.query(
+        'SELECT COUNT(*) AS cnt FROM scripts WHERE user_id = $1 AND created_at >= $2',
+        [req.userId, monthStart.toISOString()]
+      )
+      const used = parseInt(countRes.rows[0]?.cnt || 0)
+      if (used >= FREE_SCRIPT_LIMIT) {
+        return res.status(402).json({
+          success: false,
+          error: {
+            code: 'PLAN_LIMIT_REACHED',
+            message: `Free plan limit reached (${FREE_SCRIPT_LIMIT} scripts/month). Upgrade to Pro for unlimited scripts.`,
+            upgrade: true,
+          }
+        })
+      }
+    }
+  } catch {
+    // Non-fatal — never block generation due to quota DB error
+  }
+  next()
+}
 
 function sendSSE(res, event, data) {
   res.write(`event: ${event}\n`)
@@ -25,6 +71,7 @@ router.post(
   '/generate',
   requireBrowserLike,
   aiGenerationLimiter,
+  checkPlanLimit,
   validate({
     body: {
       topicTitle: { required: true, type: 'string', maxLength: 200 },

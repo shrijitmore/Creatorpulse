@@ -78,7 +78,11 @@ export function ScriptGenerationProvider({ children }) {
         saveToStorage(tid, gen, kit)
       },
       (err) => {
-        const msg = typeof err === 'string' && err.length < 120 ? err : 'Script generation failed. Please try again.'
+        // 402 = plan limit reached — surface a clear upgrade prompt
+        const isLimit = typeof err === 'string' && err.includes('402')
+        const msg = isLimit
+          ? 'Free plan limit reached (5 scripts/month). Upgrade to Pro for unlimited scripts.'
+          : typeof err === 'string' && err.length < 160 ? err : 'Script generation failed. Please try again.'
         setError(msg)
         setIsGenerating(false)
       }

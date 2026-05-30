@@ -434,8 +434,13 @@ export default function ScriptStudio() {
 
       {/* Error */}
       {error && (
-        <div style={{ marginBottom: 20, padding: '12px 16px', background: 'rgba(192,74,46,0.08)', border: '1px solid rgba(192,74,46,0.2)', borderRadius: 10, fontSize: 13, color: 'rgb(192,74,46)' }}>
-          ⚠ {error}
+        <div style={{ marginBottom: 20, padding: '14px 16px', background: 'rgba(192,74,46,0.06)', border: '1px solid rgba(192,74,46,0.2)', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, color: 'rgb(192,74,46)', flex: 1 }}>⚠ {error}</span>
+          {error.includes('limit reached') && (
+            <button className="btn btn-primary btn-sm" onClick={() => navigate('/plans')}>
+              Upgrade to Pro →
+            </button>
+          )}
         </div>
       )}
 

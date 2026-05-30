@@ -19,9 +19,12 @@ export async function createRazorpayOrder({ planId, cycle, coupon, userId }) {
   const amount = calcAmount(planId, cycle, coupon)
 
   if (!available) {
+    const ts = Date.now()
     return {
       simulated: true,
-      orderId: `order_sim_${Date.now()}`,
+      orderId:   `order_sim${ts}`,
+      paymentId: `pay_sim${ts}`,
+      signature: 'simulated',
       amount,
       currency: 'INR',
       keyId: 'rzp_test_placeholder',
