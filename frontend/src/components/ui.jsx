@@ -218,13 +218,21 @@ export function Modal({ open, onClose, title, kicker, children, footer, width = 
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
   if (!open) return null
-  const w = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' }[width]
+  const maxW = { sm: 448, md: 512, lg: 672, xl: 896 }[width] || 512
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center px-4 fade-in"
-      style={{ background: 'rgba(26,23,20,0.32)', backdropFilter: 'blur(2px)' }}
-      onMouseDown={onClose}>
-      <div className={`card w-full ${w}`} onMouseDown={e => e.stopPropagation()}
-        style={{ animation: 'fadeUp .2s cubic-bezier(.16,1,.3,1) forwards' }}>
+    <div
+      onMouseDown={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '0 16px',
+        background: 'rgba(26,23,20,0.32)', backdropFilter: 'blur(2px)',
+        animation: 'fadeIn .15s ease both',
+      }}>
+      <div
+        className="card"
+        onMouseDown={e => e.stopPropagation()}
+        style={{ width: '100%', maxWidth: maxW, animation: 'fadeUp .2s cubic-bezier(.16,1,.3,1) forwards' }}>
         <div className="px-6 pt-5 pb-4 border-b border-line">
           <div className="flex items-start gap-4">
             <div className="flex-1">
