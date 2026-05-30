@@ -27,9 +27,8 @@ export default function RecordingStudio({ open, onClose, script }) {
   const [recordingTime, setRecordingTime] = useState(0)
   const [isRecording, setIsRecording] = useState(false)
 
-  if (!script || !open) return null
-
-  const allScenes = script.scenes || []
+  // Derived values — safe to compute even when !open (hooks must always run)
+  const allScenes = script?.scenes || []
   const scene = allScenes[sceneIdx]
   const isLastScene = sceneIdx === allScenes.length - 1
   const completedCount = Object.keys(recordings).length
@@ -163,6 +162,9 @@ export default function RecordingStudio({ open, onClose, script }) {
   }
 
   const fmt = (s) => `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`
+
+  // All hooks have been called — now safe to bail out early
+  if (!script || !open) return null
 
   // ── Session summary ─────────────────────────────────────────────────────────
 
