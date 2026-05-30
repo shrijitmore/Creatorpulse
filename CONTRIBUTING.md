@@ -18,7 +18,7 @@ cp .env.example .env   # fill in your keys
 
 # Frontend
 cd ../frontend && npm install
-cp .env.example .env.local
+cp .env.example .env   # only VITE_CLERK_PUBLISHABLE_KEY needed
 ```
 
 ## Workflow

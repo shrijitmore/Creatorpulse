@@ -2,7 +2,7 @@
 
 ## Project Overview
 AI-powered content intelligence platform for solo creators.
-Monorepo: `apps/web` (Vite/React) + `apps/api` (Express/Node.js)
+Monorepo: `frontend/` (Vite/React) + `backend/` (Express/Node.js)
 
 ---
 
@@ -10,19 +10,18 @@ Monorepo: `apps/web` (Vite/React) + `apps/api` (Express/Node.js)
 
 ```
 creatorpulse/
-├── apps/
-│   ├── web/          # Frontend — Vite + React + Tailwind CDN
-│   └── api/          # Backend — Express + LangGraph + Gemini
+├── frontend/          # Vite + React + Tailwind CSS
+├── backend/           # Express + LangGraph + Gemini
+├── Dockerfile         # Multi-stage build (frontend + backend)
 ├── docs/
-│   ├── features.md   # All planned features with status
-│   └── architecture.md
-└── AGENTS.md
+│   └── features.md    # All features with status
+└── CLAUDE.md          # Engineering rules (this file)
 ```
 
 ### Frontend feature structure
 Each feature is self-contained:
 ```
-apps/web/src/features/{feature}/
+frontend/src/features/{feature}/
   ├── index.jsx          # Main page component (default export)
   ├── components/        # Feature-specific components
   └── hooks/             # Feature-specific hooks
@@ -30,22 +29,25 @@ apps/web/src/features/{feature}/
 
 Shared across features:
 ```
-apps/web/src/
+frontend/src/
   ├── components/ui/     # Design system — Button, Chip, Modal, etc.
   ├── components/layout/ # Shell, Sidebar, Topbar
+  ├── context/           # TrendsContext, ScriptGenerationContext
   ├── constants/         # ALL magic values — theme, niches, platforms
   ├── lib/               # api.js, apiClient.js, auth.jsx
   └── App.jsx
 ```
 
-### Backend feature structure
+### Backend structure
 ```
-apps/api/
-  ├── features/{feature}/
-  │   ├── routes.js      # Express router
-  │   └── *.js           # Business logic
-  ├── lib/               # gemini.js, auth.js, embeddings.js, memory.js
-  ├── db/index.js        # Database connection + migrations
+backend/
+  ├── agents/            # scraper, trendAnalyst, scriptWriter, hookCopy, onboarding
+  ├── routes/            # trends, scripts, scene, recording, onboarding, profile, memory, billing
+  ├── lib/               # gemini.js, auth.js, embeddings.js, memory.js, validate.js,
+  │                      # limiters.js, config.js, logger.js, billingService.js
+  ├── jobs/              # scrapeJob (background cron)
+  ├── db.js              # Database connection + migrations
+  ├── constants.js       # All magic numbers/values
   └── server.js          # App entry — middleware + route mounting only
 ```
 
