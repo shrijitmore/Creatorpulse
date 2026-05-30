@@ -155,30 +155,45 @@ function IdlePhase({ onSelect }) {
 
 // ─── Loading phase ────────────────────────────────────────────────────────────
 
-function LoadingPhase({ nicheLabel }) {
-  const [stepIdx, setStepIdx] = useState(0)
-  const [progress, setProgress] = useState(0)
-  const rafRef = useRef(null)
-  const startRef = useRef(Date.now())
+function LoadingPhase({ nicheLabel, startedAt }) {
   const TOTAL_MS = 36000
+  const startRef = useRef(startedAt || Date.now())
+
+  // Calculate which step we're on based on elapsed time — survives remount after navigation
+  const calcStep = () => {
+    const elapsed = Date.now() - startRef.current
+    let accum = 0
+    for (let i = 0; i < FETCH_STEPS.length - 1; i++) {
+      accum += FETCH_STEPS[i].duration
+      if (elapsed < accum) return i
+    }
+    return FETCH_STEPS.length - 1
+  }
+
+  const [stepIdx, setStepIdx] = useState(calcStep)
+  const [progress, setProgress] = useState(() => Math.min(90, ((Date.now() - startRef.current) / TOTAL_MS) * 100))
+  const rafRef = useRef(null)
 
   useEffect(() => {
-    const advanceStep = (idx) => {
-      if (idx >= FETCH_STEPS.length - 1) return
-      const timer = setTimeout(() => {
-        setStepIdx(idx + 1)
-        advanceStep(idx + 1)
-      }, FETCH_STEPS[idx].duration)
-      return timer
+    // Schedule only the step transitions that haven't happened yet
+    const elapsed = Date.now() - startRef.current
+    const timers = []
+    let accum = 0
+    for (let i = 0; i < FETCH_STEPS.length - 1; i++) {
+      accum += FETCH_STEPS[i].duration
+      const delay = accum - elapsed
+      if (delay > 0) {
+        const target = i + 1
+        timers.push(setTimeout(() => setStepIdx(target), delay))
+      }
     }
-    const timer = advanceStep(0)
     const tick = () => {
-      const elapsed = Date.now() - startRef.current
-      setProgress(Math.min(90, (elapsed / TOTAL_MS) * 100))
+      const el = Date.now() - startRef.current
+      setProgress(Math.min(90, (el / TOTAL_MS) * 100))
       rafRef.current = requestAnimationFrame(tick)
     }
     rafRef.current = requestAnimationFrame(tick)
-    return () => { clearTimeout(timer); cancelAnimationFrame(rafRef.current) }
+    return () => { timers.forEach(clearTimeout); cancelAnimationFrame(rafRef.current) }
   }, [])
 
   const stepItems = FETCH_STEPS.map((step, i) => {
@@ -221,7 +236,7 @@ function LoadingPhase({ nicheLabel }) {
 
 export default function Dashboard() {
   // All scan state lives in TrendsContext (wraps Layout) so it survives navigation.
-  const { phase, activeNiche, allTrends, lastUpdated, refreshing, selectNiche, refresh, resetNiche } = useTrendsContext()
+  const { phase, activeNiche, allTrends, lastUpdated, refreshing, loadingStartedAt, selectNiche, refresh, resetNiche } = useTrendsContext()
 
   const [platform, setPlatform] = useState('all')
   const [signal, setSignal] = useState('all')
@@ -274,7 +289,7 @@ export default function Dashboard() {
   if (phase === 'loading') {
     return (
       <div className="app-main">
-        <LoadingPhase nicheLabel={nicheLabel}/>
+        <LoadingPhase nicheLabel={nicheLabel} startedAt={loadingStartedAt}/>
       </div>
     )
   }

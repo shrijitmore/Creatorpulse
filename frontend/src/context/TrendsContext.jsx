@@ -15,6 +15,7 @@ export function TrendsProvider({ children }) {
   const [allTrends, setAllTrends] = useState([])
   const [lastUpdated, setLastUpdated] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [loadingStartedAt, setLoadingStartedAt] = useState(null)
   const fetchingRef = useRef(false)
 
   // Start a scan for a niche. Called by the niche picker.
@@ -24,6 +25,7 @@ export function TrendsProvider({ children }) {
     setActiveNiche(niche)
     localStorage.setItem('trendforge_active_niche', JSON.stringify(niche))
     setPhase('loading')
+    setLoadingStartedAt(Date.now())
     fetchingRef.current = true
     try {
       const data = await getTrends([niche.nicheId], [])
@@ -52,13 +54,14 @@ export function TrendsProvider({ children }) {
     setPhase('idle')
     setActiveNiche(null)
     setAllTrends([])
+    setLoadingStartedAt(null)
     localStorage.removeItem('trendforge_active_niche')
   }, [])
 
   const value = useMemo(() => ({
-    phase, activeNiche, allTrends, lastUpdated, refreshing,
+    phase, activeNiche, allTrends, lastUpdated, refreshing, loadingStartedAt,
     selectNiche, refresh, resetNiche,
-  }), [phase, activeNiche, allTrends, lastUpdated, refreshing, selectNiche, refresh, resetNiche])
+  }), [phase, activeNiche, allTrends, lastUpdated, refreshing, loadingStartedAt, selectNiche, refresh, resetNiche])
 
   return <TrendsContext.Provider value={value}>{children}</TrendsContext.Provider>
 }
