@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/clerk-react'
-import { useTrends } from '../features/dashboard/hooks/useTrends.js'
+import { useTrendsContext } from '../context/TrendsContext.jsx'
 import { getProfile } from '../lib/api.js'
 import { getNiche } from '../constants/niches.js'
 import NichePicker from '../features/dashboard/components/NichePicker.jsx'
@@ -220,12 +220,9 @@ function LoadingPhase({ nicheLabel }) {
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const storedNicheRaw = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem('trendforge_active_niche') || 'null') } catch { return null }
-  }, [])
+  // All scan state lives in TrendsContext (wraps Layout) so it survives navigation.
+  const { phase, activeNiche, allTrends, lastUpdated, refreshing, selectNiche, refresh, resetNiche } = useTrendsContext()
 
-  const [phase, setPhase] = useState('idle')
-  const [activeNiche, setActiveNiche] = useState(storedNicheRaw)
   const [platform, setPlatform] = useState('all')
   const [signal, setSignal] = useState('all')
   const [apiProfile, setApiProfile] = useState(null)
@@ -237,31 +234,8 @@ export default function Dashboard() {
       .catch(() => {})
   }, [])
 
-  const nicheIds = useMemo(() => activeNiche ? [activeNiche.nicheId] : [], [activeNiche])
-
-  const { allTrends, refreshing, lastUpdated, fetchNow, refresh } = useTrends(nicheIds, { lazy: true })
-
-  const handleNicheSelect = useCallback(async (niche) => {
-    setActiveNiche(niche)
-    localStorage.setItem('trendforge_active_niche', JSON.stringify(niche))
-    setPhase('loading')
-    try {
-      await fetchNow([niche.nicheId])
-      setPhase('ready')
-    } catch {
-      setPhase('idle')
-    }
-  }, [fetchNow])
-
-  const handleRefresh = useCallback(() => {
-    refresh(nicheIds).catch(() => {})
-  }, [nicheIds, refresh])
-
-  const handleChangeNiche = useCallback(() => {
-    setPhase('idle')
-    setActiveNiche(null)
-    localStorage.removeItem('trendforge_active_niche')
-  }, [])
+  const handleRefresh = useCallback(() => { refresh() }, [refresh])
+  const handleChangeNiche = useCallback(() => { resetNiche() }, [resetNiche])
 
   const filtered = useMemo(() => {
     let list = [...allTrends]
@@ -292,7 +266,7 @@ export default function Dashboard() {
     return (
       <div className="app-main">
         <div style={{ marginBottom: 20 }}><CreatorBrief apiProfile={apiProfile} stats={profileStats}/></div>
-        <IdlePhase onSelect={handleNicheSelect}/>
+        <IdlePhase onSelect={selectNiche}/>
       </div>
     )
   }

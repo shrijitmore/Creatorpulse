@@ -1,30 +1,32 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useMemo } from 'react'
 import { getTrends, refreshTrends } from '../lib/api.js'
-import { NICHES } from '../lib/mockData.js'
 
 const TrendsContext = createContext(null)
 
-function getStoredNiches() {
-  try {
-    const stored = JSON.parse(localStorage.getItem('trendforge_niches') || '[]')
-    return Array.isArray(stored) && stored.length > 0 ? stored : NICHES.map(n => n.id)
-  } catch { return NICHES.map(n => n.id) }
+function readStoredNiche() {
+  try { return JSON.parse(localStorage.getItem('trendforge_active_niche') || 'null') } catch { return null }
 }
 
 export function TrendsProvider({ children }) {
-  const [phase, setPhase] = useState('idle')       // idle | loading | ready
-  const [selectedNiches, setSelectedNiches] = useState(getStoredNiches)
+  // phase: 'idle' | 'loading' | 'ready'
+  // activeNiche: { nicheId, nicheLabel, ... } | null
+  const [phase, setPhase] = useState('idle')
+  const [activeNiche, setActiveNiche] = useState(readStoredNiche)
   const [allTrends, setAllTrends] = useState([])
   const [lastUpdated, setLastUpdated] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
   const fetchingRef = useRef(false)
 
-  const fetchNow = useCallback(async (niches) => {
+  // Start a scan for a niche. Called by the niche picker.
+  // Keeps running even if the user navigates away — state lives here, not in Dashboard.
+  const selectNiche = useCallback(async (niche) => {
     if (fetchingRef.current) return
-    fetchingRef.current = true
+    setActiveNiche(niche)
+    localStorage.setItem('trendforge_active_niche', JSON.stringify(niche))
     setPhase('loading')
+    fetchingRef.current = true
     try {
-      const data = await getTrends(niches, [])
+      const data = await getTrends([niche.nicheId], [])
       setAllTrends(data.trends || [])
       setLastUpdated(new Date())
       setPhase('ready')
@@ -35,24 +37,28 @@ export function TrendsProvider({ children }) {
     }
   }, [])
 
-  const refresh = useCallback(async (niches) => {
+  const refresh = useCallback(async () => {
+    if (!activeNiche) return
     setRefreshing(true)
     try {
-      const data = await refreshTrends(niches, [])
+      const data = await refreshTrends([activeNiche.nicheId], [])
       setAllTrends(data.trends || [])
       setLastUpdated(new Date())
     } catch {}
     finally { setRefreshing(false) }
-  }, [])
+  }, [activeNiche])
 
-  const toggleNiche = useCallback((id) => {
-    setSelectedNiches(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  const resetNiche = useCallback(() => {
+    setPhase('idle')
+    setActiveNiche(null)
+    setAllTrends([])
+    localStorage.removeItem('trendforge_active_niche')
   }, [])
 
   const value = useMemo(() => ({
-    phase, selectedNiches, allTrends, lastUpdated, refreshing,
-    fetchNow, refresh, toggleNiche, setSelectedNiches,
-  }), [phase, selectedNiches, allTrends, lastUpdated, refreshing, fetchNow, refresh, toggleNiche])
+    phase, activeNiche, allTrends, lastUpdated, refreshing,
+    selectNiche, refresh, resetNiche,
+  }), [phase, activeNiche, allTrends, lastUpdated, refreshing, selectNiche, refresh, resetNiche])
 
   return <TrendsContext.Provider value={value}>{children}</TrendsContext.Provider>
 }
