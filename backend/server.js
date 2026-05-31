@@ -3,9 +3,13 @@ dotenv.config({ path: '.env.development' })
 dotenv.config()
 import express from 'express'
 import cors from 'cors'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import Redis from 'ioredis'
+import { validateConfig, config } from './lib/config.js'
+import { logger } from './lib/logger.js'
 import { getDb, closeDb } from './db.js'
 import { clerkMw } from './lib/auth.js'
 import { startScrapeJob, stopScrapeJob } from './jobs/scrapeJob.js'
@@ -20,26 +24,153 @@ import recordingRouter from './routes/recording.js'
 import billingRouter from './routes/billing.js'
 import nichesRouter from './routes/niches.js'
 
+// Validate all required secrets before anything else starts.
+validateConfig()
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
-const PORT = process.env.PORT || 3000
+const { port: PORT, isProd: IS_PROD } = config
 
-// ── Middleware ─────────────────────────────────────────────────────────────────
+// ── Proxy trust ───────────────────────────────────────────────────────────────
+// Required for correct req.ip and req.secure behind Nginx / Render / Fly / Heroku.
+// TRUST_PROXY=1 means trust one hop (the load balancer). Set to your proxy count.
+if (config.trustProxy) {
+  app.set('trust proxy', config.trustProxy)
+}
 
-app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] }))
-app.use(express.json({ limit: '10mb' }))
+// ── HTTPS redirect ────────────────────────────────────────────────────────────
+// Terminates plain HTTP at the app layer in production. In practice, HTTPS
+// termination happens at the reverse proxy — this is a belt-and-suspenders guard.
+if (IS_PROD) {
+  app.use((req, res, next) => {
+    const proto = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http')
+    if (proto !== 'https') {
+      logger.security('https.redirect', { ip: req.ip, path: req.path })
+      return res.redirect(301, `https://${req.headers.host}${req.url}`)
+    }
+    next()
+  })
+}
+
+// ── Security headers (Helmet) ─────────────────────────────────────────────────
+
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      // 'unsafe-inline' required: Clerk's <ClerkProvider> injects inline scripts into the
+      // served frontend HTML at runtime. Nonce-based CSP would require SSR support.
+      // Mitigated by the explicit *.clerk.accounts.dev host allowlist.
+      scriptSrc: ["'self'", "'unsafe-inline'", 'https://clerk.usable-anchovy-5.clerk.accounts.dev', 'https://*.clerk.accounts.dev'],
+      connectSrc: ["'self'", 'https://*.clerk.accounts.dev', 'https://api.clerk.dev'],
+      frameSrc: ["'self'", 'https://*.clerk.accounts.dev'],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      // 'unsafe-inline' required for Clerk's component styles injected at runtime.
+      styleSrc: ["'self'", "'unsafe-inline'"],
+    }
+  },
+  crossOriginEmbedderPolicy: false,
+}))
+
+// ── CORS ──────────────────────────────────────────────────────────────────────
+
+const ALLOWED_ORIGINS = IS_PROD
+  ? (process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : [])
+  : ['http://localhost:8080', 'http://localhost:5173', 'http://127.0.0.1:8080']
+
+app.use(cors({
+  origin: (origin, cb) => {
+    // Allow server-to-server requests (no origin) only in dev
+    if (!origin) return cb(null, !IS_PROD)
+    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true)
+    cb(new Error(`CORS: origin '${origin}' not allowed`))
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+}))
+
+// ── Rate limiting ─────────────────────────────────────────────────────────────
+// These are broad IP-based guards applied before auth runs.
+// Per-user, per-operation limits for expensive AI endpoints live in lib/limiters.js
+// and are applied directly on the routes that need them.
+
+// Baseline IP guard — catches bots and scrapers that haven't been fingerprinted yet.
+// 60 req/min is generous for a browser; a scraper hammering the API will hit this.
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    logger.security('rate_limit.global', {
+      ip:     req.ip,
+      path:   req.path,
+      userId: req.userId || null,
+    })
+    res.status(429).json({
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many requests — slow down.' },
+    })
+  },
+})
+
+// Auth-path limiter — extra tight for pre-auth routes and billing.
+// Runs in addition to apiLimiter, so effective ceiling is min(20/15min, 60/min).
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    logger.security('rate_limit.auth_path', {
+      ip:   req.ip,
+      path: req.path,
+    })
+    res.status(429).json({
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many requests — try again in 15 minutes.' },
+    })
+  },
+})
+
+app.use('/api/', apiLimiter)
+app.use('/api/auth', authLimiter)
+app.use('/api/onboarding', authLimiter)
+app.use('/api/billing', authLimiter)
+
+// ── Body parsing ──────────────────────────────────────────────────────────────
+// Audio routes receive base64-encoded recordings (up to ~15 MB of binary).
+// Mount their own parser BEFORE the global 1 mb limit so express-body-parser
+// uses the larger cap for those prefixes and skips re-parsing everywhere else.
+
+app.use('/api/recording', express.json({ limit: '20mb' }))
+app.use('/api/memory',    express.json({ limit: '20mb' }))
+app.use(express.json({ limit: '1mb' }))
 
 // Clerk middleware — parses auth token on every request, sets req.auth
 if (process.env.CLERK_SECRET_KEY) {
   app.use(clerkMw)
 }
 
-// Request logger
+// ── Request logger ────────────────────────────────────────────────────────────
+// Runs after Clerk so req.userId is available for auth-context logging.
+// 5xx → error, 4xx → warn, 2xx/3xx → info.
+
 app.use((req, res, next) => {
   const start = Date.now()
   res.on('finish', () => {
-    const ms = Date.now() - start
-    console.log(`${req.method} ${req.path} → ${res.statusCode} (${ms}ms)`)
+    const data = {
+      method: req.method,
+      path:   req.path,
+      status: res.statusCode,
+      ms:     Date.now() - start,
+      ip:     req.ip,
+      userId: req.userId || null,
+    }
+    if (res.statusCode >= 500)      logger.error('request', data)
+    else if (res.statusCode >= 400) logger.warn('request', data)
+    else                            logger.info('request', data)
   })
   next()
 })
@@ -47,27 +178,28 @@ app.use((req, res, next) => {
 // ── Redis / Valkey ─────────────────────────────────────────────────────────────
 
 function initRedis() {
-  const url = process.env.REDIS_URL || 'redis://localhost:6379'
-  const opts = { lazyConnect: true, enableOfflineQueue: false, connectTimeout: 5000 }
-
-  if (process.env.REDIS_PASSWORD) {
-    opts.password = process.env.REDIS_PASSWORD
+  const opts = {
+    lazyConnect: true,
+    enableOfflineQueue: false,
+    connectTimeout: 5000,
   }
 
-  const client = new Redis(url, opts)
+  if (config.redis.password) opts.password = config.redis.password
 
-  client.on('connect', () => console.log('[redis] Connected'))
+  const client = new Redis(config.redis.url, opts)
+
+  client.on('connect', () => logger.info('redis.connected'))
   client.on('error', err => {
-    // Don't crash — Redis is optional for caching
+    // Redis is optional (caching). Don't crash, just warn.
     if (err.code !== 'ECONNREFUSED' && err.code !== 'ENOTFOUND') {
-      console.error('[redis] Error:', err.message)
+      logger.warn('redis.error', { message: err.message })
     }
   })
 
   client.connect()
     .then(() => { startScrapeJob(client) })
     .catch(err => {
-      console.warn('[redis] Could not connect — caching disabled:', err.message)
+      logger.warn('redis.unavailable', { message: err.message })
     })
 
   return client
@@ -107,7 +239,6 @@ app.get('/api', (req, res) => {
     description: 'AI-powered content intelligence platform — trend scraping, viral analysis, and script generation',
     mode: 'live',
     endpoints: [
-      'POST /api/auth/login',
       'GET  /api/auth/me',
       'GET  /api/trends',
       'POST /api/trends/refresh',
@@ -125,48 +256,51 @@ app.get('/api', (req, res) => {
   })
 })
 
-// ── Gemini test (dev only) ────────────────────────────────────────────────────
+// ── Dev-only test endpoints ───────────────────────────────────────────────────
+// These endpoints are disabled in production to prevent internal API exposure.
 
-app.get('/api/gemini-test', async (req, res) => {
-  try {
-    const { createGeminiModel, extractResponseText, extractJson, hasGeminiCredentials } = await import('./lib/gemini.js')
-    if (!hasGeminiCredentials()) {
-      return res.status(503).json({ ok: false, error: 'No Gemini credentials configured' })
+if (!IS_PROD) {
+  app.get('/api/gemini-test', async (req, res) => {
+    try {
+      const { createGeminiModel, extractResponseText, extractJson, hasGeminiCredentials } = await import('./lib/gemini.js')
+      if (!hasGeminiCredentials()) {
+        return res.status(503).json({ ok: false, error: 'No Gemini credentials configured' })
+      }
+      const model = createGeminiModel({ temperature: 0.1, maxOutputTokens: 200 })
+      const response = await model.invoke('Return ONLY valid JSON: {"suggestion": "test suggestion", "reasoning": "test", "confidence": "high", "pros": ["a"], "cons": [], "cascadingChange": {"needed": false, "element": null, "reason": "", "suggestion": ""}, "dataSource": "style_suggestion"}')
+      const text = extractResponseText(response)
+      console.log('[gemini-test] raw response:', text.slice(0, 300))
+      const parsed = extractJson(text)
+      res.json({ ok: true, response: text.slice(0, 200), parsed })
+    } catch (err) {
+      const detail = err.cause?.message || err.message
+      console.error('[gemini-test] Error:', detail, err.stack?.split('\n').slice(0,4).join(' | '))
+      res.status(500).json({ ok: false, error: detail })
     }
-    const model = createGeminiModel({ temperature: 0.1, maxOutputTokens: 200 })
-    const response = await model.invoke('Return ONLY valid JSON: {"suggestion": "test suggestion", "reasoning": "test", "confidence": "high", "pros": ["a"], "cons": [], "cascadingChange": {"needed": false, "element": null, "reason": "", "suggestion": ""}, "dataSource": "style_suggestion"}')
-    const text = extractResponseText(response)
-    console.log('[gemini-test] raw response:', text.slice(0, 300))
-    const parsed = extractJson(text)
-    res.json({ ok: true, response: text.slice(0, 200), parsed })
-  } catch (err) {
-    const detail = err.cause?.message || err.message
-    console.error('[gemini-test] Error:', detail, err.stack?.split('\n').slice(0,4).join(' | '))
-    res.status(500).json({ ok: false, error: detail })
-  }
-})
+  })
 
-app.post('/api/scene-test', async (req, res) => {
-  try {
-    const { createGeminiModel, extractResponseText, extractJson } = await import('./lib/gemini.js')
-    const { sceneNumber = 2, element = 'visual', currentValue = 'Quick cuts: B-roll of people working', userPrompt = 'What if I look not in camera', tone = 'storytelling', niche = 'fitness' } = req.body || {}
-    const model = createGeminiModel({ temperature: 0.4, maxOutputTokens: 4000 })
-    const prompt = `You are a script coach helping a ${niche} content creator refine their reel script.
+  app.post('/api/scene-test', async (req, res) => {
+    try {
+      const { createGeminiModel, extractResponseText, extractJson } = await import('./lib/gemini.js')
+      const { sceneNumber = 2, element = 'visual', currentValue = 'Quick cuts: B-roll of people working', userPrompt = 'What if I look not in camera', tone = 'storytelling', niche = 'fitness' } = req.body || {}
+      const model = createGeminiModel({ temperature: 0.4, maxOutputTokens: 4000 })
+      const prompt = `You are a script coach helping a ${niche} content creator refine their reel script.
 CURRENT SCENE ${sceneNumber}:
 ${element === 'visual' ? `Visual: "${currentValue}"` : `Voiceover: "${currentValue}"`}
 USER WANTS: "${userPrompt}"
 Return ONLY valid JSON: { "suggestion": "...", "reasoning": "...", "confidence": "high|medium|low", "pros": ["..."], "cons": [], "cascadingChange": { "needed": false, "element": null, "reason": "", "suggestion": "" }, "dataSource": "style_suggestion" }`
-    const response = await model.invoke(prompt)
-    const content = extractResponseText(response)
-    console.log('[scene-test] response preview:', content.slice(0, 200))
-    const parsed = extractJson(content)
-    res.json({ ok: true, parsed })
-  } catch (err) {
-    const detail = err.cause?.message || err.message
-    console.error('[scene-test] Error:', detail, err.stack?.split('\n').slice(0,3).join(' | '))
-    res.status(500).json({ ok: false, error: detail, errorType: err.constructor.name })
-  }
-})
+      const response = await model.invoke(prompt)
+      const content = extractResponseText(response)
+      console.log('[scene-test] response preview:', content.slice(0, 200))
+      const parsed = extractJson(content)
+      res.json({ ok: true, parsed })
+    } catch (err) {
+      const detail = err.cause?.message || err.message
+      console.error('[scene-test] Error:', detail, err.stack?.split('\n').slice(0,3).join(' | '))
+      res.status(500).json({ ok: false, error: detail, errorType: err.constructor.name })
+    }
+  })
+}
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
@@ -243,26 +377,13 @@ app.get('/docs', (req, res) => {
     <div class="section-title">Authentication</div>
     <div class="endpoint">
       <div class="endpoint-header">
-        <span class="method post">POST</span>
-        <span class="endpoint-path">/api/auth/login</span>
-        <span class="endpoint-desc">Authenticate user</span>
-      </div>
-      <div class="endpoint-body">
-        <div class="label">Request</div>
-        <pre>{ "email": "alex@trendforge.io", "password": "demo123" }</pre>
-        <div class="label">Response</div>
-        <pre>{ "success": true, "data": { "user": { "id": "user-1", "email": "alex@trendforge.io", "niches": ["fitness","tech"] } } }</pre>
-      </div>
-    </div>
-    <div class="endpoint">
-      <div class="endpoint-header">
         <span class="method get">GET</span>
         <span class="endpoint-path">/api/auth/me</span>
-        <span class="endpoint-desc">Get current user</span>
+        <span class="endpoint-desc">Get current user (requires Clerk Bearer token)</span>
       </div>
       <div class="endpoint-body">
         <div class="label">Response</div>
-        <pre>{ "success": true, "data": { "user": { "id": "user-1", "email": "alex@trendforge.io", "niches": ["fitness","tech"] } } }</pre>
+        <pre>{ "success": true, "data": { "user": { "id": "...", "email": "...", "niches": [...], "plan": "free" } } }</pre>
       </div>
     </div>
   </div>
@@ -362,7 +483,7 @@ data: {"script":{...},"contentKit":{...}}</pre>
         <div class="label">Request</div>
         <pre>{ "niches": ["fitness", "tech", "finance"] }</pre>
         <div class="label">Response</div>
-        <pre>{ "success": true, "data": { "user": { "id": "user-1", "email": "alex@trendforge.io", "niches": ["fitness","tech","finance"] } } }</pre>
+        <pre>{ "success": true, "data": { "niches": ["fitness","tech","finance"] } }</pre>
       </div>
     </div>
   </div>
@@ -396,10 +517,21 @@ app.get('*', (req, res) => {
 // ── Error handler ─────────────────────────────────────────────────────────────
 
 app.use((err, req, res, _next) => {
-  console.error('[server] Unhandled error:', err)
+  logger.error('server.unhandled_error', {
+    message: err.message,
+    stack:   IS_PROD ? undefined : err.stack,
+    method:  req.method,
+    path:    req.path,
+    ip:      req.ip,
+    userId:  req.userId || null,
+  })
   res.status(500).json({
     success: false,
-    error: { code: 'SERVER_ERROR', message: err.message || 'Internal server error' }
+    // Never leak stack traces or internal error details to the client in production.
+    error: {
+      code:    'SERVER_ERROR',
+      message: IS_PROD ? 'Internal server error' : (err.message || 'Internal server error'),
+    },
   })
 })
 
@@ -407,41 +539,37 @@ app.use((err, req, res, _next) => {
 
 async function start() {
   try {
-    // Initialize DB (runs migrations)
     await getDb()
 
     const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`\n🚀 Creatorpulse API running on port ${PORT}`)
-      console.log(`   Mode: 🟢 LIVE`)
-      console.log(`   Docs: http://localhost:${PORT}/docs`)
-      console.log(`   Health: http://localhost:${PORT}/health\n`)
+      logger.info('server.started', {
+        port: PORT,
+        env:  process.env.NODE_ENV || 'development',
+      })
     })
 
-    // Graceful shutdown
     const shutdown = async signal => {
-      console.log(`\n[server] ${signal} received — shutting down gracefully`)
+      logger.info('server.shutdown', { signal })
       server.close(async () => {
         try {
           stopScrapeJob()
           await closeDb()
           await redis.quit()
-          console.log('[server] Redis connection closed')
         } catch (_) {}
-        console.log('[server] Server closed')
+        logger.info('server.stopped')
         process.exit(0)
       })
 
-      // Force exit after 10s
       setTimeout(() => {
-        console.error('[server] Forced shutdown after timeout')
+        logger.error('server.shutdown_timeout')
         process.exit(1)
       }, 10000)
     }
 
     process.on('SIGTERM', () => shutdown('SIGTERM'))
-    process.on('SIGINT', () => shutdown('SIGINT'))
+    process.on('SIGINT',  () => shutdown('SIGINT'))
   } catch (err) {
-    console.error('[server] Failed to start:', err)
+    logger.error('server.start_failed', { message: err.message, stack: err.stack })
     process.exit(1)
   }
 }

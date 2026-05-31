@@ -4,6 +4,8 @@ import { createGeminiModel, extractResponseText } from '../lib/gemini.js'
 import { getCreatorProfile } from '../lib/memory.js'
 import { getDb } from '../db.js'
 import crypto from 'crypto'
+import { recordingLimiter, requireBrowserLike } from '../lib/limiters.js'
+import { validate, sanitizeText, VALID_TONES } from '../lib/validate.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -15,7 +17,22 @@ router.use(requireAuth)
  *
  * Body: { audioBase64, mimeType, sceneText, sceneNumber, scriptTone, niche }
  */
-router.post('/analyse', async (req, res) => {
+router.post(
+  '/analyse',
+  requireBrowserLike,
+  recordingLimiter,
+  validate({
+    body: {
+      audioBase64:    { required: true, type: 'base64', maxBytes: 15 * 1024 * 1024 },
+      mimeType:       { type: 'audioMime' },
+      sceneText:      { required: true, type: 'string', maxLength: 3000 },
+      sceneNumber:    { type: 'integer', min: 1, max: 50 },
+      scriptTone:     { type: 'string', oneOf: VALID_TONES },
+      niche:          { type: 'string', maxLength: 50 },
+      fullScriptText: { type: 'string', maxLength: 6000 },
+    },
+  }),
+  async (req, res) => {
   try {
     const {
       audioBase64,
@@ -27,9 +44,10 @@ router.post('/analyse', async (req, res) => {
       fullScriptText = '',
     } = req.body
 
-    if (!audioBase64 || !sceneText) {
-      return res.status(400).json({ success: false, error: { code: 'MISSING_FIELDS', message: 'audioBase64 and sceneText required' } })
-    }
+    // Sanitize free-text fields before interpolating into the AI prompt
+    const safeSceneText     = sanitizeText(sceneText, 3000)
+    const safeScriptTone    = sanitizeText(scriptTone, 50)
+    const safeNiche         = sanitizeText(niche, 50)
 
     const profile = await getCreatorProfile(req.userId)
     const languageStyle = profile?.language_style || 'English'
@@ -40,19 +58,19 @@ router.post('/analyse', async (req, res) => {
     const prompt = `You are a voice coach analysing a content creator's script recording.
 
 SCRIPT (what they should have said):
-"${sceneText}"
+<scene_text>${safeSceneText}</scene_text>
 
-Expected tone: ${scriptTone}
-Creator's language style: ${languageStyle}
-Content format: ${contentFormat}
-Niche: ${niche}
+Expected tone: ${safeScriptTone}
+Creator's language style: ${sanitizeText(languageStyle, 50)}
+Content format: ${sanitizeText(contentFormat, 50)}
+Niche: ${safeNiche}
 ${profile ? `Creator voice profile: ${(Array.isArray(profile.voice_traits) ? profile.voice_traits : JSON.parse(profile.voice_traits || '[]')).join(', ')}` : ''}
 
 Analyse this audio recording for:
 1. Script accuracy — did they say the right words? Note specific deviations.
 2. Filler words — list every "um", "like", "basically", "you know", "uh", etc. with approximate position.
 3. Confidence — detect: voice trembling, trailing off at sentence ends, upward inflection on statements (makes them sound like questions), rushing through important words.
-4. Energy match — does their energy/enthusiasm match the "${scriptTone}" tone requirement? Score it.
+4. Energy match — does their energy/enthusiasm match the "${safeScriptTone}" tone requirement? Score it.
 5. Emotion authenticity — does it sound genuine or rehearsed/robotic?
 6. Voice raise analysis — did they emphasise the RIGHT words? What was emphasised vs. what should have been?
 7. Pace — was it too fast, too slow, or well-paced per sentence?
@@ -161,7 +179,8 @@ Return ONLY valid JSON:
     console.error('[recording/analyse] Error:', err.message)
     res.status(500).json({ success: false, error: { code: 'ANALYSE_ERROR', message: err.message } })
   }
-})
+  }
+)
 
 /**
  * GET /api/recording/stats

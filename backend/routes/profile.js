@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { requireAuth } from '../lib/auth.js'
 import { getCreatorProfile, saveCreatorProfile } from '../lib/memory.js'
 import { getDb } from '../db.js'
+import { validate } from '../lib/validate.js'
 
 const router = Router()
 
@@ -113,7 +114,19 @@ router.get('/', requireAuth, async (req, res) => {
 })
 
 // PATCH /api/profile — update profile fields
-router.patch('/', requireAuth, async (req, res) => {
+router.patch('/', requireAuth, validate({
+  body: {
+    creatorName:     { type: 'string', maxLength: 100 },
+    audiencePersona: { type: 'string', maxLength: 500 },
+    audienceAge:     { type: 'integer', min: 13, max: 100 },
+    primaryGoal:     { type: 'string', maxLength: 200 },
+    rawVoiceSample:  { type: 'string', maxLength: 10000 },
+    languageStyle:   { type: 'string', maxLength: 50 },
+    contentFormat:   { type: 'string', maxLength: 50 },
+    platforms:       { type: 'array', maxItems: 10, itemType: 'string', itemMaxLength: 50 },
+    contentStyles:   { type: 'array', maxItems: 10, itemType: 'string', itemMaxLength: 50 },
+  },
+}), async (req, res) => {
   try {
     const allowed = ['creatorName', 'platforms', 'contentStyles', 'audiencePersona', 'audienceAge', 'primaryGoal', 'rawVoiceSample', 'languageStyle', 'contentFormat']
     const updates = Object.fromEntries(
@@ -149,10 +162,14 @@ router.patch('/', requireAuth, async (req, res) => {
 })
 
 // POST /api/profile/mark-used — mark script as used + add engagement score
-router.post('/mark-used', requireAuth, async (req, res) => {
+router.post('/mark-used', requireAuth, validate({
+  body: {
+    scriptId:        { required: true, type: 'uuid' },
+    engagementScore: { type: 'integer', min: 0, max: 100 },
+  },
+}), async (req, res) => {
   try {
     const { scriptId, engagementScore } = req.body
-    if (!scriptId) return res.status(400).json({ success: false, error: { code: 'MISSING_SCRIPT_ID' } })
 
     const db = await getDb()
     await db.query(

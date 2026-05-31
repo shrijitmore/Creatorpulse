@@ -128,12 +128,6 @@ export async function updateNiches(niches) {
   return { niches }
 }
 
-export async function updateSettings(settings) {
-  if (settings.apiKeys) {
-    localStorage.setItem('trendforge_api_keys', JSON.stringify(settings.apiKeys))
-  }
-  return { success: true }
-}
 
 // ─── Onboarding ───────────────────────────────────────────────────────────────
 
