@@ -55,14 +55,17 @@ if (IS_PROD) {
 // ── Security headers (Helmet) ─────────────────────────────────────────────────
 
 app.use(helmet({
-  // Allow Clerk's hosted UI assets in CSP
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
+      // 'unsafe-inline' required: Clerk's <ClerkProvider> injects inline scripts into the
+      // served frontend HTML at runtime. Nonce-based CSP would require SSR support.
+      // Mitigated by the explicit *.clerk.accounts.dev host allowlist.
       scriptSrc: ["'self'", "'unsafe-inline'", 'https://clerk.usable-anchovy-5.clerk.accounts.dev', 'https://*.clerk.accounts.dev'],
       connectSrc: ["'self'", 'https://*.clerk.accounts.dev', 'https://api.clerk.dev'],
       frameSrc: ["'self'", 'https://*.clerk.accounts.dev'],
       imgSrc: ["'self'", 'data:', 'https:'],
+      // 'unsafe-inline' required for Clerk's component styles injected at runtime.
       styleSrc: ["'self'", "'unsafe-inline'"],
     }
   },

@@ -2,6 +2,13 @@
  * Backend constants — shared across agents, routes, services.
  */
 
+// Input validation allowlists — imported by validate.js and routes
+export const VALID_TONES    = ['educational', 'entertaining', 'controversial', 'storytelling']
+export const VALID_FORMATS  = ['30s', '60s', '90s']
+export const VALID_ELEMENTS = ['visual', 'voiceover', 'hook', 'cta']
+export const VALID_CYCLES   = ['monthly', 'yearly']
+export const VALID_SECTIONS = ['hookVariants', 'caption', 'hashtags', 'thumbnailText', 'fullScript']
+
 export const NICHES_DEFAULT = ['fitness', 'finance', 'tech', 'lifestyle', 'food', 'travel', 'beauty', 'gaming']
 
 // Billing — amounts in paise (INR × 100) for Razorpay

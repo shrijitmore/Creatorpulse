@@ -3,14 +3,6 @@ import { getDb } from '../db.js'
 import { logger } from './logger.js'
 import { trackFailedAuth } from './limiters.js'
 
-const IS_PROD = process.env.NODE_ENV === 'production'
-
-// Fail fast in production if Clerk is not configured — never silently open the API.
-if (IS_PROD && !process.env.CLERK_SECRET_KEY) {
-  process.stderr.write('[auth] FATAL: CLERK_SECRET_KEY is not set in production. Refusing to start.\n')
-  process.exit(1)
-}
-
 export const clerkMw = clerkMiddleware()
 
 /**
@@ -20,7 +12,7 @@ export const clerkMw = clerkMiddleware()
  */
 export async function requireAuth(req, res, next) {
   if (!process.env.CLERK_SECRET_KEY) {
-    // Dev-only bypass — process.exit above makes this unreachable in production.
+    // Dev-only bypass — validateConfig() in server.js exits before this runs in production.
     req.userId = process.env.DEV_USER_ID || 'dev-user-1'
     return next()
   }

@@ -14,13 +14,8 @@
  * Types: 'string' | 'integer' | 'number' | 'boolean' | 'array' | 'uuid' | 'base64' | 'audioMime'
  */
 
-// ── Exported allowlists ───────────────────────────────────────────────────────
-
-export const VALID_TONES    = ['educational', 'entertaining', 'controversial', 'storytelling']
-export const VALID_FORMATS  = ['30s', '60s', '90s']
-export const VALID_ELEMENTS = ['visual', 'voiceover', 'hook', 'cta']
-export const VALID_CYCLES   = ['monthly', 'yearly']
-export const VALID_SECTIONS = ['hookVariants', 'caption', 'hashtags', 'thumbnailText', 'fullScript']
+// ── Allowlists (source of truth lives in constants.js) ────────────────────────
+export { VALID_TONES, VALID_FORMATS, VALID_ELEMENTS, VALID_CYCLES, VALID_SECTIONS } from '../constants.js'
 
 // ── Private patterns ──────────────────────────────────────────────────────────
 
