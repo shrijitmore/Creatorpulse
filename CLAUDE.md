@@ -2,7 +2,7 @@
 
 ## Project Overview
 AI-powered content intelligence platform for solo creators.
-Monorepo: `apps/web` (Vite/React) + `apps/api` (Express/Node.js)
+Frontend: `frontend/` (Vite/React) | Backend: `backend/` (Express/Node.js)
 
 ---
 
@@ -10,27 +10,37 @@ Monorepo: `apps/web` (Vite/React) + `apps/api` (Express/Node.js)
 
 ```
 creatorpulse/
-├── apps/
-│   ├── web/          # Frontend — Vite + React + Tailwind CDN
-│   └── api/          # Backend — Express + LangGraph + Gemini
+├── frontend/          # Vite + React 18 + custom CSS
+│   └── src/
+│       ├── features/  # studio/, profile/, onboarding/
+│       ├── pages/     # Dashboard.jsx, ScriptStudio.jsx, etc.
+│       ├── components/
+│       ├── hooks/
+│       ├── constants/
+│       └── lib/
+├── backend/           # Express + LangGraph + Gemini
+│   ├── agents/        # scraper, trendAnalyst, scriptWriter, hookCopy, pipeline
+│   ├── routes/        # trends, scripts, scene, recording, onboarding, profile, memory, user, billing, niches
+│   ├── lib/           # gemini.js, auth.js, embeddings.js, memory.js
+│   ├── jobs/          # scrapeJob.js (background cron)
+│   ├── db.js          # Database connection + migrations (Supabase or PGlite)
+│   ├── constants.js   # All magic numbers/values
+│   └── server.js      # App entry — middleware + route mounting only
 ├── docs/
-│   ├── features.md   # All planned features with status
-│   └── architecture.md
 └── CLAUDE.md
 ```
 
 ### Frontend feature structure
-Each feature is self-contained:
+Features live in `frontend/src/features/{feature}/`. Pages live in `frontend/src/pages/`.
 ```
-apps/web/src/features/{feature}/
-  ├── index.jsx          # Main page component (default export)
-  ├── components/        # Feature-specific components
-  └── hooks/             # Feature-specific hooks
+frontend/src/features/{feature}/
+  ├── *.jsx              # Feature components
+  └── hooks/             # Feature-specific hooks (where applicable)
 ```
 
 Shared across features:
 ```
-apps/web/src/
+frontend/src/
   ├── components/ui/     # Design system — Button, Chip, Modal, etc.
   ├── components/layout/ # Shell, Sidebar, Topbar
   ├── constants/         # ALL magic values — theme, niches, platforms
@@ -38,15 +48,14 @@ apps/web/src/
   └── App.jsx
 ```
 
-### Backend feature structure
+### Backend structure
 ```
-apps/api/
-  ├── features/{feature}/
-  │   ├── routes.js      # Express router
-  │   └── *.js           # Business logic
-  ├── lib/               # gemini.js, auth.js, embeddings.js, memory.js
-  ├── db/index.js        # Database connection + migrations
-  └── server.js          # App entry — middleware + route mounting only
+backend/
+  ├── routes/{feature}.js   # Express router — thin, calls service
+  ├── agents/               # LangGraph AI agents
+  ├── lib/                  # Shared utilities
+  ├── db.js                 # DB init + migrations
+  └── server.js             # Middleware + route mounting only
 ```
 
 ---
@@ -185,7 +194,7 @@ import { useTrends } from '@/features/dashboard/hooks/useTrends'
 
 | Layer | Tech |
 |-------|------|
-| Frontend | Vite + React 18 + Tailwind CSS CDN |
+| Frontend | Vite + React 18 + custom CSS (`design.css`) |
 | Auth | Clerk (`@clerk/clerk-react`, `@clerk/express`) |
 | Backend | Express.js (Node.js ESM) |
 | AI Agents | LangGraph.js + Gemini 2.5 Flash (Vertex AI) |
@@ -197,7 +206,7 @@ import { useTrends } from '@/features/dashboard/hooks/useTrends'
 
 ## Constants files location
 ```
-apps/web/src/constants/
+frontend/src/constants/
   ├── theme.js       # All colors, shadows, radii
   ├── niches.js      # Niche definitions with icons, subreddits, hashtags
   ├── platforms.js   # Platform definitions, YT categories

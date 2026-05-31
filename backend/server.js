@@ -102,7 +102,7 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api', (req, res) => {
   res.json({
-    name: 'TrendForge API',
+    name: 'Creatorpulse API',
     version: '1.0.0',
     description: 'AI-powered content intelligence platform — trend scraping, viral analysis, and script generation',
     mode: 'live',
@@ -194,7 +194,7 @@ app.get('/docs', (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TrendForge API Docs</title>
+  <title>Creatorpulse API Docs</title>
   <style>
     :root {
       --bg: #0a0a0f;
@@ -234,7 +234,7 @@ app.get('/docs', (req, res) => {
 </head>
 <body>
 <div class="header">
-  <h1>TrendForge API <span class="badge">v1.0.0</span></h1>
+  <h1>Creatorpulse API <span class="badge">v1.0.0</span></h1>
   <p>AI-powered content intelligence — trend scraping, viral analysis &amp; script generation</p>
 </div>
 <div class="container">
@@ -388,7 +388,7 @@ app.get('*', (req, res) => {
   const indexPath = path.join(distPath, 'index.html')
   res.sendFile(indexPath, err => {
     if (err) {
-      res.status(200).json({ status: 'ok', service: 'TrendForge API', docs: '/docs' })
+      res.status(200).json({ status: 'ok', service: 'Creatorpulse API', docs: '/docs' })
     }
   })
 })
@@ -411,7 +411,7 @@ async function start() {
     await getDb()
 
     const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`\n🚀 TrendForge API running on port ${PORT}`)
+      console.log(`\n🚀 Creatorpulse API running on port ${PORT}`)
       console.log(`   Mode: 🟢 LIVE`)
       console.log(`   Docs: http://localhost:${PORT}/docs`)
       console.log(`   Health: http://localhost:${PORT}/health\n`)

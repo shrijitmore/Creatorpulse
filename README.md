@@ -18,7 +18,7 @@
 
 | Layer | Tech |
 |-------|------|
-| Frontend | Vite + React 18 + Tailwind CSS |
+| Frontend | Vite + React 18 + custom CSS |
 | Auth | Clerk |
 | Backend | Express.js (Node.js ESM) |
 | AI Agents | LangGraph.js + Gemini 2.5 Flash (Vertex AI) |
@@ -32,20 +32,21 @@
 
 ```
 creatorpulse/
-├── frontend/          # Vite + React
+├── frontend/          # Vite + React 18
 │   ├── src/
 │   │   ├── constants/ # theme, niches, platforms, signals (no hardcoded values)
-│   │   ├── features/  # studio/, profile/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── hooks/
-│   │   └── lib/
+│   │   ├── features/  # studio/, profile/, onboarding/
+│   │   ├── components/# ui/ design system + layout/
+│   │   ├── pages/     # Dashboard, ScriptStudio, Onboarding, Profile, etc.
+│   │   ├── hooks/     # shared hooks
+│   │   └── lib/       # api.js, apiClient.js, auth.jsx
 │   └── .env.local
-├── backend/           # Express API
-│   ├── agents/        # scraper, trendAnalyst, scriptWriter, hookCopy, onboarding
-│   ├── routes/        # trends, scripts, scene, recording, onboarding, profile, memory
-│   ├── lib/           # gemini, auth, embeddings, memory
-│   ├── jobs/          # scrapeJob (background cron)
+├── backend/           # Express API (Node.js ESM)
+│   ├── agents/        # scraper, trendAnalyst, scriptWriter, hookCopy, pipeline
+│   ├── routes/        # trends, scripts, scene, recording, onboarding, profile, memory, user, billing, niches
+│   ├── lib/           # gemini.js, auth.js, embeddings.js, memory.js
+│   ├── jobs/          # scrapeJob.js (background cron)
+│   ├── db.js          # DB init + migrations (Supabase pooler or PGlite dev fallback)
 │   ├── constants.js   # all magic numbers/values
 │   └── .env
 ├── docs/
@@ -71,7 +72,7 @@ cd backend
 npm install
 ```
 
-Create `backend/.env`:
+Create `backend/.env` (copy from `backend/.env.example`):
 
 ```env
 # AI — Vertex AI (Gemini)
@@ -80,20 +81,25 @@ GEMINI_MODEL=gemini-2.5-flash
 GOOGLE_CLOUD_PROJECT=your-project-id
 GOOGLE_CLOUD_LOCATION=us-central1
 
-# Database
-# DATABASE_URL=postgresql://postgres.xxx:password@aws-0-region.pooler.supabase.com:6543/postgres
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_ANON_KEY=sb_publishable_...
+# Database — Supabase pooler connection string
+# Leave unset to use PGlite (local dev, no setup needed)
+DATABASE_URL=postgresql://postgres.xxx:password@aws-0-region.pooler.supabase.com:6543/postgres
 
 # Scraping
-APIFY_API_KEY=apify_api_...
+YOUTUBE_API_KEY=AIza...
 INSTAGRAM_SESSION_ID=your_session_id
 INSTAGRAM_CSRF_TOKEN=your_csrf_token
-YOUTUBE_API_KEY=AIza...
+APIFY_API_KEY=apify_api_...
 
 # Auth
-CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
+
+# Billing (optional)
+RAZORPAY_KEY_ID=rzp_test_...
+RAZORPAY_KEY_SECRET=your_secret
+
+# Redis (optional — falls back to in-memory cache)
+# REDIS_URL=redis://localhost:6379
 ```
 
 ```bash
@@ -107,12 +113,11 @@ cd frontend
 npm install
 ```
 
-Create `frontend/.env.local`:
+Create `frontend/.env.local` (copy from `frontend/.env.example`):
 
 ```env
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
-VITE_SUPABASE_URL=https://xxx.supabase.co
-VITE_SUPABASE_ANON_KEY=sb_publishable_...
+# VITE_API_URL=http://localhost:3000  # only needed if backend runs on different port
 ```
 
 ```bash
@@ -128,12 +133,12 @@ npm run dev
 
 | Key | Where |
 |-----|-------|
-| Gemini / Vertex AI | [console.cloud.google.com](https://console.cloud.google.com) → Enable Vertex AI → Service Account |
+| Gemini / Vertex AI | [console.cloud.google.com](https://console.cloud.google.com) → Enable Vertex AI → Service Account → JSON key |
 | YouTube Data API | [console.cloud.google.com](https://console.cloud.google.com) → APIs → YouTube Data API v3 → Create API Key |
 | Apify (Instagram) | [console.apify.com](https://console.apify.com/account/integrations) |
 | Instagram session | Log into Instagram in browser → DevTools → Application → Cookies → copy `sessionid` + `csrftoken` |
-| Clerk | [clerk.com](https://clerk.com) → Create application → API Keys |
-| Supabase | [supabase.com](https://supabase.com) → New project → Settings → Database → Connection String |
+| Clerk | [clerk.com](https://clerk.com) → Create application → API Keys → grab Secret Key |
+| Supabase DATABASE_URL | [supabase.com](https://supabase.com) → Project → Settings → Database → Connection string → **Transaction pooler** (port 6543) |
 
 ---
 
@@ -148,6 +153,24 @@ User selects topic
   → Agent 3: Script Writer (Gemini — scene-by-scene script in creator's language)
   → Agent 4: Hook & Copy (Gemini — 3 hook variants, caption, hashtags, thumbnail text)
 ```
+
+### API routes
+
+| Route | Description |
+|-------|-------------|
+| `POST /api/auth/login` | Authenticate via Clerk token |
+| `GET /api/trends` | Fetch cached trends by niche + platform |
+| `POST /api/trends/refresh` | Invalidate cache, re-scrape |
+| `POST /api/scripts/generate` | Generate script — SSE stream |
+| `POST /api/scripts/regenerate-section` | Regenerate one section of a script |
+| `GET/DELETE /api/scripts/:id` | Fetch or delete a script |
+| `POST /api/scene/edit` | AI per-scene edit with followup chain |
+| `POST /api/recording/analyse` | Analyse audio delivery via Gemini |
+| `GET/PUT /api/onboarding` | Onboarding steps |
+| `GET/PUT /api/profile` | Creator profile + voice fingerprint |
+| `GET /api/niches` | Available niches |
+| `POST /api/billing/create-order` | Razorpay order creation |
+| `GET /health` | Health check |
 
 ### Caching strategy
 
