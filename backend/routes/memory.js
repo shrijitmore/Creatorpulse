@@ -3,11 +3,13 @@ import { requireAuth } from '../lib/auth.js'
 import { getMemorySummary, buildCreatorContext } from '../lib/memory.js'
 import { findSimilarScripts, getCoveredTopics } from '../lib/embeddings.js'
 import { transcribeAudio } from '../lib/gemini.js'
+import { transcribeLimiter, requireBrowserLike } from '../lib/limiters.js'
+import { validate } from '../lib/validate.js'
 
 const router = Router()
 
 // GET /api/memory/summary?niche=fitness — sidebar memory widget data
-router.get('/summary', requireAuth, async (req, res) => {
+router.get('/summary', requireAuth, validate({ query: { niche: { type: 'string', maxLength: 50 } } }), async (req, res) => {
   try {
     const { niche } = req.query
     const summary = await getMemorySummary(req.userId, niche || null)
@@ -19,10 +21,9 @@ router.get('/summary', requireAuth, async (req, res) => {
 })
 
 // GET /api/memory/similar?topic=...&niche=... — find similar past scripts
-router.get('/similar', requireAuth, async (req, res) => {
+router.get('/similar', requireAuth, validate({ query: { topic: { required: true, type: 'string', maxLength: 200 }, niche: { type: 'string', maxLength: 50 } } }), async (req, res) => {
   try {
     const { topic, niche } = req.query
-    if (!topic) return res.status(400).json({ success: false, error: { code: 'MISSING_TOPIC' } })
 
     const similar = await findSimilarScripts(req.userId, topic, 3)
     res.json({ success: true, data: { similar } })
@@ -33,7 +34,7 @@ router.get('/similar', requireAuth, async (req, res) => {
 })
 
 // GET /api/memory/topics?niche=fitness — topics already covered
-router.get('/topics', requireAuth, async (req, res) => {
+router.get('/topics', requireAuth, validate({ query: { niche: { type: 'string', maxLength: 50 } } }), async (req, res) => {
   try {
     const { niche } = req.query
     const topics = await getCoveredTopics(req.userId, niche || null)
@@ -45,10 +46,9 @@ router.get('/topics', requireAuth, async (req, res) => {
 })
 
 // POST /api/memory/context — full RAG context for script generation
-router.post('/context', requireAuth, async (req, res) => {
+router.post('/context', requireAuth, validate({ body: { topicTitle: { required: true, type: 'string', maxLength: 200 }, niche: { type: 'string', maxLength: 50 } } }), async (req, res) => {
   try {
     const { topicTitle, niche } = req.body
-    if (!topicTitle) return res.status(400).json({ success: false, error: { code: 'MISSING_TOPIC' } })
 
     const context = await buildCreatorContext(req.userId, topicTitle, niche || 'general')
     res.json({ success: true, data: { context } })
@@ -59,18 +59,27 @@ router.post('/context', requireAuth, async (req, res) => {
 })
 
 // POST /api/memory/transcribe-voice — transcribe audio clip + extract voice traits via Gemini
-router.post('/transcribe-voice', requireAuth, async (req, res) => {
+router.post(
+  '/transcribe-voice',
+  requireAuth,
+  requireBrowserLike,
+  transcribeLimiter,
+  validate({
+    body: {
+      audioBase64: { required: true, type: 'base64', maxBytes: 15 * 1024 * 1024 },
+      mimeType:    { type: 'audioMime' },
+    },
+  }),
+  async (req, res) => {
   try {
     const { audioBase64, mimeType = 'audio/webm' } = req.body
-    if (!audioBase64) {
-      return res.status(400).json({ success: false, error: { code: 'MISSING_AUDIO', message: 'audioBase64 required' } })
-    }
     const result = await transcribeAudio(audioBase64, mimeType)
     res.json({ success: true, data: result })
   } catch (err) {
     console.error('[memory/transcribe-voice]', err.message)
     res.status(500).json({ success: false, error: { code: 'TRANSCRIBE_ERROR', message: err.message } })
   }
-})
+  }
+)
 
 export default router

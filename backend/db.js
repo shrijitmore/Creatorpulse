@@ -3,6 +3,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { rm, writeFile, unlink } from 'fs/promises'
 import { existsSync } from 'fs'
+import { logger } from './lib/logger.js'
 
 const require = createRequire(import.meta.url)
 
@@ -14,11 +15,19 @@ let pgliteClient = null
 function initPg(connectionString) {
   const pg = require('pg')
   const { Pool } = pg
+  const IS_PROD = process.env.NODE_ENV === 'production'
+
+  // Strip any sslmode query param — we set SSL options explicitly below.
   const cleanUrl = connectionString.replace(/[?&]sslmode=[^&]*/g, '')
-  const pool = new Pool({
-    connectionString: cleanUrl,
-    ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false }
-  })
+
+  // In production, always verify the Supabase / PostgreSQL server certificate.
+  // Set DB_SSL=false only for a local Postgres instance without SSL configured.
+  const sslConfig = process.env.DB_SSL === 'false'
+    ? false
+    : { rejectUnauthorized: IS_PROD }
+
+  const pool = new Pool({ connectionString: cleanUrl, ssl: sslConfig })
+
   return {
     query: async (sql, params) => {
       const result = await pool.query(sql, params)
@@ -51,7 +60,7 @@ async function releaseLock() {
 async function initPglite() {
   const { PGlite } = await import('@electric-sql/pglite')
   const dbPath = join(tmpdir(), 'pglite-trendforge')
-  console.log(`[db] PGlite path: ${dbPath}`)
+  logger.info('db.pglite_path', { path: dbPath })
 
   await acquireProcessLock()
 
@@ -65,14 +74,13 @@ async function initPglite() {
   try {
     client = await tryOpen(dbPath)
   } catch (err) {
-    // node --watch restarts before the old process releases the lock.
-    console.warn('[db] PGlite init failed, retrying in 1.5s...')
+    logger.warn('db.pglite_retry', { message: err.message })
     await new Promise(r => setTimeout(r, 1500))
     try {
       client = await tryOpen(dbPath)
     } catch {
       // Data dir is unrecoverable — wipe and recreate (dev only, last resort).
-      console.warn('[db] PGlite still failing, resetting data directory...')
+      logger.warn('db.pglite_reset', { path: dbPath })
       await rm(dbPath, { recursive: true, force: true })
       client = await tryOpen(dbPath)
     }
@@ -102,10 +110,10 @@ export async function getDb() {
   if (db) return db
 
   if (process.env.DATABASE_URL) {
-    console.log('[db] Using PostgreSQL (Supabase)')
+    logger.info('db.init', { driver: 'postgresql' })
     db = initPg(process.env.DATABASE_URL)
   } else {
-    console.log('[db] Using PGlite (local dev)')
+    logger.info('db.init', { driver: 'pglite' })
     db = await initPglite()
   }
 
@@ -250,10 +258,12 @@ async function runMigrations(db) {
       created_at       TIMESTAMPTZ DEFAULT NOW()
     )`,
 
-    // Seed default user (dev only)
-    `INSERT INTO users (id, email, name, niches)
-     VALUES ('user-1', 'alex@trendforge.io', 'Alex', ARRAY['fitness','tech'])
-     ON CONFLICT DO NOTHING`,
+    // Seed default user for local dev — skipped in production
+    process.env.NODE_ENV !== 'production'
+      ? `INSERT INTO users (id, email, name, niches)
+         VALUES ('dev-user-1', 'dev@localhost', 'Dev User', ARRAY['fitness','tech'])
+         ON CONFLICT DO NOTHING`
+      : null,
   ].filter(Boolean)
 
   for (const sql of statements) {
@@ -262,10 +272,10 @@ async function runMigrations(db) {
     } catch (err) {
       // ivfflat index may fail on small datasets — non-fatal
       if (!err.message.includes('ivfflat')) {
-        console.error('[db] Migration error:', err.message.slice(0, 120))
+        logger.error('db.migration_error', { message: err.message.slice(0, 120) })
       }
     }
   }
 
-  console.log('[db] Migrations complete')
+  logger.info('db.migrations_complete')
 }

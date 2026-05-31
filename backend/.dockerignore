@@ -1,0 +1,24 @@
+# Dependencies — reinstalled by npm ci during build
+node_modules
+
+# All env files — secrets are injected at runtime, never baked into the image
+.env
+.env.*
+*.env
+*.env.local
+
+# Dev and test artifacts
+dev.log
+*.log
+coverage
+.nyc_output
+
+# Git history — not needed at runtime
+.git
+.gitignore
+
+# Editor config
+.vscode
+.idea
+*.swp
+*.swo
