@@ -68,8 +68,9 @@ export async function scrapeTrends(niches, platforms, userCtx = {}) {
   const results = []
 
   // Run all scrapers in parallel
+  // Instagram disabled — session cookie expired, Apify limit exceeded
   await Promise.all([
-    scrapeInstagram(activeNiches, targetPlatforms, results, userCtx),
+    // scrapeInstagram(activeNiches, targetPlatforms, results, userCtx),
     scrapeYouTube(activeNiches, targetPlatforms, results, userCtx),
     scrapeReddit(activeNiches, targetPlatforms, results),
   ])
