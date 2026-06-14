@@ -46,16 +46,19 @@ export async function getTrends(niches = [], platforms = []) {
   const params = new URLSearchParams()
   if (niches.length) params.set('niches', niches.join(','))
   if (platforms.length) params.set('platforms', platforms.join(','))
-  const data = await apiFetch(`/api/trends?${params}`)
-  return data.data || data
+  const res = await apiFetch(`/api/trends?${params}`)
+  const data = res.data || res
+  // Surface meta.warming so the UI can show "getting your results" + poll.
+  return { trends: data.trends || [], recommendations: data.recommendations || [], warming: !!res.meta?.warming }
 }
 
 export async function refreshTrends(niches = [], platforms = []) {
-  const data = await apiFetch('/api/trends/refresh', {
+  const res = await apiFetch('/api/trends/refresh', {
     method: 'POST',
     body: JSON.stringify({ niches, platforms })
   })
-  return data.data || data
+  const data = res.data || res
+  return { trends: data.trends || [], recommendations: data.recommendations || [], warming: !!res.meta?.warming }
 }
 
 // ─── Recording studio ──────────────────────────────────────────────────────────
