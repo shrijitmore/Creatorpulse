@@ -17,5 +17,10 @@
 
 import dotenv from 'dotenv'
 
-dotenv.config({ path: '.env.development' })
+// Pick the env file by NODE_ENV: .env.development (default) or .env.production.
+// Then load .env as a shared fallback. dotenv never overrides an already-set key,
+// so the environment-specific file wins, and real OS env vars (Cloud Run) win over both.
+const env = process.env.NODE_ENV || 'development'
+
+dotenv.config({ path: `.env.${env}` })
 dotenv.config()

@@ -1,0 +1,40 @@
+name: Deploy backend to Cloud Run
+
+# Auto-deploys the backend on push to main when backend code changes.
+# Env vars/secrets are NOT set here — they already live on the Cloud Run service
+# and are preserved across deploys, so CI only ships code (no secrets in GitHub).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+permissions:
+  contents: read
+  id-token: write # required for Workload Identity Federation
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        name: Authenticate to Google Cloud (WIF — no stored keys)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SA_EMAIL }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy creatorpulse-api \
+            --source backend \
+            --region asia-northeast1 \
+            --project influensa-499411 \
+            --quiet
