@@ -4,6 +4,7 @@ import {
   NICHE_YT_CATEGORIES,
   NICHE_SUBREDDITS,
 } from '../constants.js'
+import { logger } from '../lib/logger.js'
 
 // ── Main scraper ──────────────────────────────────────────────────────────────
 
@@ -18,7 +19,11 @@ export async function scrapeTrends(niches, platforms, userCtx = {}) {
     scrapeReddit(activeNiches, targetPlatforms, results),
   ])
 
-  console.log(`[scraper] Total: ${results.length} — YT:${results.filter(r=>r.platform==='youtube').length} Reddit:${results.filter(r=>r.platform==='reddit').length}`)
+  logger.info('scraper.total', {
+    total:   results.length,
+    youtube: results.filter(r => r.platform === 'youtube').length,
+    reddit:  results.filter(r => r.platform === 'reddit').length,
+  })
   return results
 }
 
@@ -26,10 +31,10 @@ export async function scrapeTrends(niches, platforms, userCtx = {}) {
 
 async function scrapeYouTube(niches, platforms, results, userCtx = {}) {
   const key = process.env.YOUTUBE_API_KEY
-  if (!key) { console.log('[scraper] YouTube: no API key'); return }
+  if (!key) { logger.warn('scraper.youtube_no_key'); return }
 
   const isPrimary = userCtx.primaryPlatform === 'youtube'
-  const nicheLimit = isPrimary ? 6 : 4
+  const nicheLimit = isPrimary ? 8 : 6
 
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600000).toISOString()
   let ytCount = 0
@@ -38,10 +43,17 @@ async function scrapeYouTube(niches, platforms, results, userCtx = {}) {
     try {
       const cat = NICHE_YT_CATEGORIES[niche] || { id: '0', query: niche }
 
-      // Search recent trending videos for this niche
-      const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(cat.query)}&type=video&order=viewCount&publishedAfter=${sevenDaysAgo}&maxResults=5&relevanceLanguage=en&key=${key}`
+      // Search recent trending videos. maxResults=50 costs the SAME 100 units as
+      // maxResults=5 (search.list is priced per call) — so we pull a 50-item pool
+      // for free. The cron caches this pool; users sample from it (no per-user calls).
+      const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(cat.query)}&type=video&order=viewCount&publishedAfter=${sevenDaysAgo}&maxResults=50&relevanceLanguage=en&key=${key}`
       const res = await fetch(searchUrl, { signal: AbortSignal.timeout(10000) })
-      if (!res.ok) return
+      if (!res.ok) {
+        let reason = ''
+        try { const e = await res.json(); reason = e.error?.errors?.[0]?.reason || e.error?.status || '' } catch {}
+        logger.warn('scraper.youtube_http_error', { niche, status: res.status, reason })
+        return
+      }
 
       const data = await res.json()
       if (!data.items?.length) return
@@ -72,11 +84,11 @@ async function scrapeYouTube(niches, platforms, results, userCtx = {}) {
         ytCount++
       }
     } catch (err) {
-      console.error(`[scraper] YouTube error (${niche}):`, err.message)
+      logger.error('scraper.youtube_error', { niche, message: err.message })
     }
   }))
 
-  console.log(`[scraper] YouTube: ${ytCount} videos scraped`)
+  logger.info('scraper.youtube_done', { count: ytCount })
 }
 
 // ── Reddit ────────────────────────────────────────────────────────────────────
@@ -94,6 +106,10 @@ async function scrapeReddit(niches, platforms, results) {
           headers: { 'User-Agent': 'Influensa/1.0' }, signal: AbortSignal.timeout(8000)
         })
       ])
+
+      if (!searchRes.ok || !subRes.ok) {
+        logger.warn('scraper.reddit_http_error', { niche, searchStatus: searchRes.status, subStatus: subRes.status })
+      }
 
       if (searchRes.ok) {
         const data = await searchRes.json()
@@ -135,9 +151,9 @@ async function scrapeReddit(niches, platforms, results) {
         })
       }
     } catch (err) {
-      console.error(`[scraper] Reddit error (${niche}):`, err.message)
+      logger.error('scraper.reddit_error', { niche, message: err.message })
     }
   }))
 
-  console.log(`[scraper] Reddit: ${rdCount} posts scraped`)
+  logger.info('scraper.reddit_done', { count: rdCount })
 }

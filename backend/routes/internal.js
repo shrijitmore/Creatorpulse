@@ -37,9 +37,9 @@ router.post(
     const tier = req.query.tier || 'fast'
     try {
       const redis = req.app.locals.redis
-      const trends = await runScrapeTier(tier, redis)
-      logger.info('cron.scrape_done', { tier, count: trends.length })
-      res.json({ success: true, data: { tier, count: trends.length } })
+      const count = await runScrapeTier(tier, redis)
+      logger.info('cron.scrape_done', { tier, count })
+      res.json({ success: true, data: { tier, count } })
     } catch (err) {
       logger.error('cron.scrape_error', { tier, message: err.message })
       res.status(500).json({ success: false, error: { code: 'SCRAPE_ERROR', message: err.message } })

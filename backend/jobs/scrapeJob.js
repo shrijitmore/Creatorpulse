@@ -1,80 +1,88 @@
 /**
- * Background scraping job — populates the Redis cache so user requests never
- * trigger live scraping.
+ * Background scraping job — fills a per-niche Redis "pool" so user requests never
+ * trigger live scraping. External API cost is decoupled from user count: only the
+ * cron (or a deduped lazy warm) calls YouTube/Reddit; everyone reads the cache.
  *
- * Two ways to drive it:
- *   - In-process timers (startScrapeJob) — fine for a single long-lived process
- *     (local dev, or a single always-on instance). Breaks on serverless: timers
- *     stop when an instance scales to zero, and duplicate across instances.
- *   - External trigger (runScrapeTier via /api/internal/scrape) — Cloud Scheduler
- *     hits the endpoint on a schedule. Correct for autoscaling/serverless.
+ * Cache shape: one key per single niche — `trends:niche:{niche}` → { trends, recommendations }.
+ * Each pool holds up to ~50 items; the trends route samples 10 from it per request.
  *
- * Tiers:
- *   fast  → every 1h
- *   slow  → every 5h
- *   all   → every 10h
+ * Drivers:
+ *   - In-process timers (startScrapeJob) — single long-lived process only (dev).
+ *   - Cloud Scheduler → POST /api/internal/scrape (serverless/autoscaling).
  */
 import { runTrendPipeline } from '../agents/pipeline.js'
 import { NICHES_DEFAULT, CACHE_TTL } from '../constants.js'
+import { logger } from '../lib/logger.js'
 
-// Niche groups by refresh cadence. Single source of truth for both drivers.
+// Niche tiers by refresh cadence.
 export const SCRAPE_TIERS = {
   fast: ['fitness', 'tech', 'finance'],
   slow: ['lifestyle', 'food', 'travel', 'beauty', 'gaming'],
   all:  NICHES_DEFAULT,
 }
 
+// Single source of truth for the per-niche pool cache key (shared with trends route).
+export function nichePoolKey(niche) {
+  return `trends:niche:${niche}`
+}
+
+// Dynamic TTL by dominant signal — viral pools expire fast, new ones live longer.
+function poolTTL(trends = []) {
+  const counts = { viral: 0, rising: 0, new: 0 }
+  for (const t of trends) counts[t.signal] = (counts[t.signal] || 0) + 1
+  if (counts.viral > trends.length * 0.3) return CACHE_TTL.viral
+  if (counts.rising > trends.length * 0.4) return CACHE_TTL.rising
+  return CACHE_TTL.new
+}
+
 let jobTimers = []
 
 /**
- * Scrape and cache a niche group.
+ * Scrape + cache ONE niche's pool. The single unit of work — used by the cron
+ * tiers and by lazy on-demand warming from the trends route. Returns the pool's
+ * trends array (empty on failure).
  */
-async function scrapeGroup(niches, label, redis) {
-  console.log(`[scrapeJob] Scraping ${label}: ${niches.join(', ')}`)
+export async function warmNiche(niche, redis) {
   try {
-    const { trends, recommendations } = await runTrendPipeline(niches, [])
-    const result = JSON.stringify({ trends, recommendations })
-
-    // Cache per-niche-group key (shared across all users with same niches)
-    const key = `trends:niche:${niches.slice().sort().join(',')}`
-
-    // Dynamic TTL based on dominant signal
-    const counts = { viral: 0, rising: 0, new: 0 }
-    for (const t of trends) counts[t.signal] = (counts[t.signal] || 0) + 1
-    const ttl = counts.viral > trends.length * 0.3 ? CACHE_TTL.viral
-              : counts.rising > trends.length * 0.4 ? CACHE_TTL.rising
-              : CACHE_TTL.new
-
-    if (redis) {
-      await redis.set(key, result, 'EX', ttl)
-      console.log(`[scrapeJob] Cached ${key} TTL=${Math.round(ttl/3600)}h — ${trends.length} trends`)
+    const { trends, recommendations } = await runTrendPipeline([niche], [])
+    if (redis && trends.length) {
+      const ttl = poolTTL(trends)
+      await redis.set(nichePoolKey(niche), JSON.stringify({ trends, recommendations }), 'EX', ttl)
+      logger.info('scrapeJob.niche_cached', { niche, count: trends.length, ttlH: Math.round(ttl / 3600) })
+    } else if (!trends.length) {
+      logger.warn('scrapeJob.niche_empty', { niche })
     }
     return trends
   } catch (err) {
-    console.error(`[scrapeJob] Failed to scrape ${label}:`, err.message)
+    logger.error('scrapeJob.niche_error', { niche, message: err.message })
     return []
   }
 }
 
 /**
- * Scrape and cache one tier. The single entry point used by both the in-process
- * timers and the external (Cloud Scheduler) endpoint.
+ * Scrape + cache every niche in a tier (each as its own pool). Sequential to
+ * avoid hammering the external APIs / tripping rate limits. Returns total items.
  */
 export async function runScrapeTier(tier, redis) {
   const niches = SCRAPE_TIERS[tier]
   if (!niches) throw new Error(`Unknown scrape tier: ${tier}`)
-  return scrapeGroup(niches, `${tier} niches`, redis)
+  logger.info('scrapeJob.tier_start', { tier, niches: niches.length })
+  let total = 0
+  for (const niche of niches) {
+    const trends = await warmNiche(niche, redis)
+    total += trends.length
+  }
+  logger.info('scrapeJob.tier_done', { tier, total })
+  return total
 }
 
 /**
- * Start in-process scheduled scraping. Use ONLY for a single long-lived process
- * (local dev or a single always-on instance). For serverless/autoscaling, leave
- * this off and drive scraping via Cloud Scheduler → /api/internal/scrape.
- * Call from server.js after Redis is connected.
+ * Start in-process scheduled scraping. Use ONLY for a single long-lived process.
+ * For serverless, leave off and drive via Cloud Scheduler → /api/internal/scrape.
  */
 export function startScrapeJob(redis) {
   if (!redis) {
-    console.log('[scrapeJob] No Redis — background scraping disabled')
+    logger.warn('scrapeJob.no_redis')
     return
   }
 
@@ -82,21 +90,20 @@ export function startScrapeJob(redis) {
   const runSlow = () => runScrapeTier('slow', redis)
   const runAll  = () => runScrapeTier('all', redis)
 
-  // Initial run on startup (staggered to avoid thundering herd)
+  // Staggered initial runs on startup to avoid a thundering herd.
   setTimeout(() => runFast(), 5000)
   setTimeout(() => runSlow(), 30000)
 
-  // Recurring schedules
   const fastTimer = setInterval(runFast, CACHE_TTL.viral * 1000)   // 1h
   const slowTimer = setInterval(runSlow, CACHE_TTL.rising * 1000)  // 5h
   const allTimer  = setInterval(runAll,  CACHE_TTL.new * 1000)     // 10h
 
   jobTimers = [fastTimer, slowTimer, allTimer]
-  console.log('[scrapeJob] In-process scraping started — fast:1h, slow:5h, all:10h')
+  logger.info('scrapeJob.inprocess_started', { fastH: 1, slowH: 5, allH: 10 })
 }
 
 export function stopScrapeJob() {
   jobTimers.forEach(t => clearInterval(t))
   jobTimers = []
-  console.log('[scrapeJob] Background scraping stopped')
+  logger.info('scrapeJob.stopped')
 }
