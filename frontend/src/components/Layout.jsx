@@ -4,6 +4,7 @@ import { UserButton, useUser, useClerk } from '@clerk/clerk-react'
 import { TrendsProvider } from '../context/TrendsContext.jsx'
 import { COLORS } from '../constants/theme.js'
 import { useRecentScripts } from '../hooks/useRecentScripts.js'
+import { useMe } from '../hooks/useMe.js'
 
 const NAV = [
   { to: '/dashboard', label: 'Dashboard',      icon: '◈', shortcut: 'G D' },
@@ -22,6 +23,7 @@ const ROUTE_TITLES = {
   '/plans':         { kicker: 'Billing',     title: 'Plans & pricing' },
   '/checkout':      { kicker: 'Billing',     title: 'Checkout' },
   '/plans/success': { kicker: 'Billing',     title: 'Upgrade complete' },
+  '/admin':         { kicker: 'Admin',       title: 'Control panel' },
 }
 
 // ─── Command palette ──────────────────────────────────────────────────────────
@@ -125,6 +127,8 @@ function Sidebar({ onCommand }) {
   const email = user?.primaryEmailAddress?.emailAddress || ''
 
   const recentScripts = useRecentScripts(3)
+  const { isAdmin } = useMe()
+  const navItems = isAdmin ? [...NAV, { to: '/admin', label: 'Admin', icon: '⚑' }] : NAV
 
   return (
     <aside className="side">
@@ -133,7 +137,7 @@ function Sidebar({ onCommand }) {
 
       {/* Navigation */}
       <nav className="side-nav">
-        {NAV.map(({ to, label, icon }) => {
+        {navItems.map(({ to, label, icon }) => {
           const active = location.pathname === to || (to !== '/' && location.pathname.startsWith(to))
           return (
             <button

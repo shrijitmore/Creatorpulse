@@ -8,6 +8,8 @@ import { requireAuth } from '../lib/auth.js'
 import { buildCreatorContext } from '../lib/memory.js'
 import { storeScriptEmbedding, trackTopic } from '../lib/embeddings.js'
 import { aiGenerationLimiter, aiAssistLimiter, requireBrowserLike } from '../lib/limiters.js'
+import { effectivePlan, planLimits } from '../lib/plan.js'
+import { logger } from '../lib/logger.js'
 import { validate, sanitizeText, VALID_TONES, VALID_FORMATS, VALID_SECTIONS, NICHE_RE } from '../lib/validate.js'
 
 const router = Router()
@@ -35,6 +37,32 @@ router.post(
     },
   }),
   async (req, res) => {
+  // Enforce the monthly script quota by effective plan (free = 5/month, paid = unlimited).
+  // Runs before SSE headers so a 402 JSON response is still valid.
+  try {
+    const db = await getDb()
+    const userRow = (await db.query('SELECT plan, plan_expires_at FROM users WHERE id = $1', [req.userId])).rows[0]
+    const limit = planLimits(effectivePlan(userRow)).scriptsPerMonth
+    if (Number.isFinite(limit)) {
+      const usedRow = (await db.query(
+        `SELECT COUNT(*) AS c FROM scripts WHERE user_id = $1 AND created_at >= date_trunc('month', NOW())`,
+        [req.userId]
+      )).rows[0]
+      if (parseInt(usedRow?.c || 0) >= limit) {
+        return res.status(402).json({
+          success: false,
+          error: {
+            code: 'LIMIT_REACHED',
+            message: `You've used all ${limit} scripts this month on the free plan. Upgrade to Pro for unlimited scripts.`,
+          },
+        })
+      }
+    }
+  } catch (limErr) {
+    // Fail open — a counting bug must not block paid users from generating.
+    logger.warn('scripts.limit_check_error', { message: limErr.message })
+  }
+
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
   res.setHeader('Connection', 'keep-alive')

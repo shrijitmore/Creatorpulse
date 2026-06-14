@@ -21,7 +21,7 @@ export async function requireAuth(req, res, next) {
     const auth = getAuth(req)
 
     if (!auth?.userId) {
-      const failCount = trackFailedAuth(req.ip)
+      const failCount = await trackFailedAuth(req.ip)
       logger.security('auth.rejected', {
         reason:    'no_token',
         ip:        req.ip,
@@ -65,7 +65,7 @@ export async function requireAuth(req, res, next) {
     req.clerkId = clerkUserId
     next()
   } catch (err) {
-    const failCount = trackFailedAuth(req.ip)
+    const failCount = await trackFailedAuth(req.ip)
     logger.security('auth.token_error', {
       message:   err.message,
       ip:        req.ip,

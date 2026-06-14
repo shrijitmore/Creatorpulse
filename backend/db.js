@@ -20,11 +20,25 @@ function initPg(connectionString) {
   // Strip any sslmode query param — we set SSL options explicitly below.
   const cleanUrl = connectionString.replace(/[?&]sslmode=[^&]*/g, '')
 
-  // In production, always verify the Supabase / PostgreSQL server certificate.
-  // Set DB_SSL=false only for a local Postgres instance without SSL configured.
-  const sslConfig = process.env.DB_SSL === 'false'
-    ? false
-    : { rejectUnauthorized: IS_PROD }
+  // SSL strategy:
+  //   DB_SSL=false   → no TLS (only for a local Postgres without SSL).
+  //   DB_CA_CERT set → verify the chain against the provided CA (full security).
+  //   otherwise      → TLS on, chain verification off.
+  //
+  // The Supabase transaction pooler presents a CA that isn't in Node's trust
+  // store, so rejectUnauthorized:true throws "self-signed certificate in
+  // certificate chain". Default to an encrypted-but-unverified connection so the
+  // app works out of the box; set DB_CA_CERT (download the cert from Supabase →
+  // Settings → Database → SSL configuration) to enable strict verification.
+  let sslConfig
+  if (process.env.DB_SSL === 'false') {
+    sslConfig = false
+  } else if (process.env.DB_CA_CERT) {
+    sslConfig = { ca: process.env.DB_CA_CERT, rejectUnauthorized: true }
+  } else {
+    sslConfig = { rejectUnauthorized: false }
+    if (IS_PROD) logger.warn('db.ssl_unverified', { hint: 'set DB_CA_CERT for full certificate verification' })
+  }
 
   const pool = new Pool({ connectionString: cleanUrl, ssl: sslConfig })
 
@@ -171,6 +185,12 @@ async function runMigrations(db) {
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS plan TEXT DEFAULT 'free'`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_cycle TEXT DEFAULT 'monthly'`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_expires_at TIMESTAMPTZ`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_started_at TIMESTAMPTZ`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS razorpay_subscription_id TEXT`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS razorpay_customer_id TEXT`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status TEXT`,
+    // is_comp = plan granted by admin (free access / discount), not via Razorpay
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_comp BOOLEAN DEFAULT FALSE`,
     // Ensure clerk_id unique index exists (ALTER TABLE ADD COLUMN does not add constraints)
     `CREATE UNIQUE INDEX IF NOT EXISTS users_clerk_id_unique ON users (clerk_id) WHERE clerk_id IS NOT NULL`,
 
@@ -256,6 +276,49 @@ async function runMigrations(db) {
       accuracy_score   INTEGER DEFAULT 0,
       filler_count     INTEGER DEFAULT 0,
       created_at       TIMESTAMPTZ DEFAULT NOW()
+    )`,
+
+    // Payments — audit trail of every Razorpay charge (reconciliation, refunds, disputes)
+    `CREATE TABLE IF NOT EXISTS payments (
+      id                       TEXT PRIMARY KEY,
+      user_id                  TEXT REFERENCES users(id) ON DELETE SET NULL,
+      razorpay_payment_id      TEXT UNIQUE,
+      razorpay_subscription_id TEXT,
+      razorpay_order_id        TEXT,
+      plan                     TEXT,
+      cycle                    TEXT,
+      amount                   INTEGER,
+      currency                 TEXT DEFAULT 'INR',
+      status                   TEXT,
+      method                   TEXT,
+      raw                      JSONB,
+      created_at               TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS payments_user_idx ON payments (user_id)`,
+
+    // Coupons — admin-managed access codes (free / comp access granted at redemption)
+    `CREATE TABLE IF NOT EXISTS coupons (
+      code             TEXT PRIMARY KEY,
+      kind             TEXT DEFAULT 'free_access',
+      plan             TEXT DEFAULT 'pro',
+      duration_days    INTEGER DEFAULT 30,
+      active           BOOLEAN DEFAULT TRUE,
+      max_redemptions  INTEGER,
+      redemptions      INTEGER DEFAULT 0,
+      expires_at       TIMESTAMPTZ,
+      note             TEXT,
+      created_by       TEXT,
+      created_at       TIMESTAMPTZ DEFAULT NOW()
+    )`,
+
+    // Admin audit — every privileged action (who changed what, when)
+    `CREATE TABLE IF NOT EXISTS admin_audit (
+      id              TEXT PRIMARY KEY,
+      admin_clerk_id  TEXT,
+      action          TEXT NOT NULL,
+      target_user_id  TEXT,
+      detail          JSONB DEFAULT '{}',
+      created_at      TIMESTAMPTZ DEFAULT NOW()
     )`,
 
     // Seed default user for local dev — skipped in production

@@ -213,20 +213,90 @@ export async function followupScene({ previousSuggestion, followupPrompt, elemen
   return data.data || data
 }
 
-export async function createBillingOrder({ planId, cycle, coupon = '' }) {
-  const data = await apiFetch('/api/billing/create-order', {
+// ─── Auth / user ─────────────────────────────────────────────────────────────
+
+export async function getMe() {
+  const data = await apiFetch('/api/auth/me')
+  return data.data?.user || data.data || data
+}
+
+// ─── Billing (Razorpay subscriptions) ──────────────────────────────────────────
+
+export async function createSubscription({ planId, cycle }) {
+  const data = await apiFetch('/api/billing/create-subscription', {
     method: 'POST',
-    body: JSON.stringify({ planId, cycle, coupon })
+    body: JSON.stringify({ planId, cycle })
   })
   return data.data || data
 }
 
-export async function verifyBillingPayment({ orderId, paymentId, signature, planId, cycle }) {
+export async function verifySubscription({ paymentId, subscriptionId, signature, planId, cycle }) {
   const data = await apiFetch('/api/billing/verify', {
     method: 'POST',
-    body: JSON.stringify({ orderId, paymentId, signature, planId, cycle })
+    body: JSON.stringify({ paymentId, subscriptionId, signature, planId, cycle })
   })
   return data.data || data
+}
+
+export async function cancelSubscription() {
+  const data = await apiFetch('/api/billing/cancel', { method: 'POST' })
+  return data.data || data
+}
+
+export async function redeemCode(code) {
+  const data = await apiFetch('/api/billing/redeem-code', {
+    method: 'POST',
+    body: JSON.stringify({ code })
+  })
+  return data.data || data
+}
+
+// ─── Admin ───────────────────────────────────────────────────────────────────
+
+export async function adminGetStats() {
+  const data = await apiFetch('/api/admin/stats')
+  return data.data || data
+}
+
+export async function adminListUsers(search = '') {
+  const params = new URLSearchParams()
+  if (search) params.set('search', search)
+  const data = await apiFetch(`/api/admin/users?${params}`)
+  return data.data?.users || []
+}
+
+export async function adminSetPlan(userId, { plan, cycle = 'monthly', days }) {
+  const data = await apiFetch(`/api/admin/users/${userId}/plan`, {
+    method: 'PATCH',
+    body: JSON.stringify({ plan, cycle, ...(days != null ? { days } : {}) })
+  })
+  return data.data?.user || data.data || data
+}
+
+export async function adminListPayments() {
+  const data = await apiFetch('/api/admin/payments')
+  return data.data?.payments || []
+}
+
+export async function adminListCoupons() {
+  const data = await apiFetch('/api/admin/coupons')
+  return data.data?.coupons || []
+}
+
+export async function adminCreateCoupon({ code, plan, durationDays, maxRedemptions, note }) {
+  const data = await apiFetch('/api/admin/coupons', {
+    method: 'POST',
+    body: JSON.stringify({ code, plan, durationDays, maxRedemptions, note })
+  })
+  return data.data?.coupon || data.data || data
+}
+
+export async function adminToggleCoupon(code, active) {
+  const data = await apiFetch(`/api/admin/coupons/${code}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ active })
+  })
+  return data.data?.coupon || data.data || data
 }
 
 export async function interpretNiche(query) {

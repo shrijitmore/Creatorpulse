@@ -4,7 +4,7 @@ import { useUser } from '@clerk/clerk-react'
 import { Icon } from '../components/ui.jsx'
 import { PLANS } from '../constants/plans.js'
 import { COLORS } from '../constants/theme.js'
-import { createBillingOrder, verifyBillingPayment } from '../lib/api.js'
+import { createSubscription, verifySubscription, redeemCode } from '../lib/api.js'
 
 function loadRazorpay() {
   return new Promise(resolve => {
@@ -24,9 +24,9 @@ export default function Checkout() {
 
   const planId = params.get('plan') || 'pro'
   const [cycle, setCycle] = useState(params.get('cycle') === 'yearly' ? 'yearly' : 'monthly')
-  const [coupon, setCoupon] = useState('')
-  const [couponApplied, setCouponApplied] = useState(false)
+  const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
+  const [redeeming, setRedeeming] = useState(false)
   const [error, setError] = useState('')
 
   const plan = PLANS.find(p => p.id === planId) || PLANS[1]
@@ -38,16 +38,23 @@ export default function Checkout() {
     if (!plan || plan.id === 'free') navigate('/plans', { replace: true })
   }, [plan, navigate])
 
-  const applyCoupon = () => {
-    if (coupon.trim().toUpperCase() === 'LAUNCH20') {
-      setCouponApplied(true)
-    } else {
-      setError('Invalid coupon code.')
+  const handleRedeem = async () => {
+    if (!code.trim()) return
+    setRedeeming(true)
+    setError('')
+    try {
+      const result = await redeemCode(code.trim())
+      if (result?.granted) {
+        navigate(`/plans/success?plan=${result.plan || planId}`)
+      } else {
+        setError('This code is not valid.')
+      }
+    } catch {
+      setError('This code is not valid or has expired.')
+    } finally {
+      setRedeeming(false)
     }
   }
-
-  const discountedTotal = couponApplied ? Math.round(totalPrice * 0.8) : totalPrice
-  const savings = totalPrice - discountedTotal + (cycle === 'yearly' ? (basePrice * 12 - totalPrice) : 0)
 
   const handlePay = async () => {
     setLoading(true)
@@ -56,20 +63,18 @@ export default function Checkout() {
       const ok = await loadRazorpay()
       if (!ok) throw new Error('Payment system failed to load. Please try again.')
 
-      const order = await createBillingOrder({ planId, cycle, coupon: couponApplied ? coupon : '' })
+      const sub = await createSubscription({ planId, cycle })
 
-      if (order.simulated) {
+      if (sub.simulated) {
         navigate(`/plans/success?plan=${planId}`)
         return
       }
 
       const options = {
-        key: order.keyId,
-        amount: order.amount,
-        currency: order.currency || 'INR',
+        key: sub.keyId,
+        subscription_id: sub.subscriptionId,
         name: 'Creatorpulse',
         description: `${plan.name} · ${cycle === 'yearly' ? 'Yearly' : 'Monthly'}`,
-        order_id: order.orderId,
         prefill: {
           name: user?.fullName || '',
           email: user?.primaryEmailAddress?.emailAddress || '',
@@ -78,9 +83,9 @@ export default function Checkout() {
         modal: { backdropclose: false },
         handler: async (response) => {
           try {
-            await verifyBillingPayment({
-              orderId: response.razorpay_order_id,
+            await verifySubscription({
               paymentId: response.razorpay_payment_id,
+              subscriptionId: response.razorpay_subscription_id,
               signature: response.razorpay_signature,
               planId,
               cycle,
@@ -159,7 +164,7 @@ export default function Checkout() {
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 20 }}>
                 <div>
                   <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>Creatorpulse {plan.name}</p>
-                  <p style={{ fontSize: 13, color: 'var(--mute)', marginTop: 3 }}>Billed {cycle === 'yearly' ? 'annually' : 'monthly'}</p>
+                  <p style={{ fontSize: 13, color: 'var(--mute)', marginTop: 3 }}>Billed {cycle === 'yearly' ? 'annually' : 'monthly'} · auto-renews</p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <p style={{ fontSize: 20, fontWeight: 600, color: 'var(--ink)', letterSpacing: '-0.02em' }}>
@@ -187,18 +192,12 @@ export default function Checkout() {
               {/* Totals */}
               <div style={{ borderTop: '1px solid var(--line)', marginTop: 20, paddingTop: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontSize: 13, color: 'var(--mute)' }}>Subtotal</span>
+                  <span style={{ fontSize: 13, color: 'var(--mute)' }}>{cycle === 'yearly' ? 'Billed annually' : 'Billed monthly'}</span>
                   <span style={{ fontSize: 13, color: 'var(--ink)' }}>₹{totalPrice.toLocaleString('en-IN')}</span>
                 </div>
-                {couponApplied && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <span style={{ fontSize: 13, color: COLORS.success }}>Coupon (LAUNCH20)</span>
-                    <span style={{ fontSize: 13, color: COLORS.success }}>−₹{(totalPrice - discountedTotal).toLocaleString('en-IN')}</span>
-                  </div>
-                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--line)' }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>Total due today</span>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>₹{discountedTotal.toLocaleString('en-IN')}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>Due today</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>₹{totalPrice.toLocaleString('en-IN')}</span>
                 </div>
               </div>
             </div>
@@ -213,29 +212,6 @@ export default function Checkout() {
             </div>
             <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-              {/* Coupon */}
-              <div>
-                <label className="label">Coupon code</label>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input
-                    className="input"
-                    value={coupon}
-                    onChange={e => { setCoupon(e.target.value); setCouponApplied(false); setError('') }}
-                    placeholder="e.g. LAUNCH20"
-                    style={{ flex: 1 }}
-                    disabled={couponApplied}
-                  />
-                  <button
-                    onClick={applyCoupon}
-                    disabled={!coupon.trim() || couponApplied}
-                    className="btn btn-line"
-                    style={{ height: 44, padding: '0 14px', borderRadius: 10, flexShrink: 0 }}>
-                    {couponApplied ? '✓' : 'Apply'}
-                  </button>
-                </div>
-                {couponApplied && <p style={{ fontSize: 12, color: COLORS.success, marginTop: 6 }}>Coupon applied — 20% off</p>}
-              </div>
-
               {error && (
                 <div style={{ padding: '10px 14px', borderRadius: 10, background: COLORS.errorsoft, border: `1px solid ${COLORS.error}40` }}>
                   <p style={{ fontSize: 12.5, color: COLORS.error }}>{error}</p>
@@ -244,7 +220,7 @@ export default function Checkout() {
 
               <button
                 onClick={handlePay}
-                disabled={loading}
+                disabled={loading || redeeming}
                 style={{
                   width: '100%', padding: '14px 0', borderRadius: 12,
                   background: loading ? 'var(--paper-3)' : 'var(--ink)',
@@ -260,15 +236,37 @@ export default function Checkout() {
                   </>
                 ) : (
                   <>
-                    Pay ₹{discountedTotal.toLocaleString('en-IN')}
+                    Subscribe · ₹{totalPrice.toLocaleString('en-IN')}
                     <Icon.Arrow size={14}/>
                   </>
                 )}
               </button>
 
+              {/* Access code */}
+              <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16 }}>
+                <label className="label">Have an access code?</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    className="input"
+                    value={code}
+                    onChange={e => { setCode(e.target.value.toUpperCase()); setError('') }}
+                    placeholder="e.g. FREEPRO"
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    onClick={handleRedeem}
+                    disabled={!code.trim() || redeeming}
+                    className="btn btn-line"
+                    style={{ height: 44, padding: '0 14px', borderRadius: 10, flexShrink: 0 }}>
+                    {redeeming ? '…' : 'Redeem'}
+                  </button>
+                </div>
+                <p style={{ fontSize: 11.5, color: 'var(--mute)', marginTop: 6 }}>Redeeming a code grants access instantly — no payment needed.</p>
+              </div>
+
               <p style={{ fontSize: 11.5, color: 'var(--mute)', textAlign: 'center', lineHeight: 1.6 }}>
                 Secured by Razorpay · PCI-DSS Level 1<br/>
-                Cancel anytime · No hidden fees
+                Cancel anytime from settings · No hidden fees
               </p>
             </div>
           </div>

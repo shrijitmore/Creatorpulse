@@ -23,6 +23,17 @@ export const COUPON_DISCOUNTS = {
 
 export const PLAN_IDS = ['free', 'pro', 'agency']
 
+// Hard usage limits enforced server-side. Infinity = unlimited.
+export const PLAN_LIMITS = {
+  free:   { scriptsPerMonth: 5,        niches: 3 },
+  pro:    { scriptsPerMonth: Infinity, niches: Infinity },
+  agency: { scriptsPerMonth: Infinity, niches: Infinity },
+}
+
+// How many billing cycles a subscription runs before completing.
+// Razorpay requires total_count; set high so it effectively auto-renews.
+export const SUBSCRIPTION_TOTAL_COUNT = { monthly: 120, yearly: 10 }
+
 export const SIGNAL_THRESHOLDS = { viral: 80, rising: 55 }
 
 export const CACHE_TTL = {

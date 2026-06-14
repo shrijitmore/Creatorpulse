@@ -16,6 +16,7 @@ import SignUpPage from './pages/SignUp.jsx'
 import Plans from './pages/Plans.jsx'
 import Checkout from './pages/Checkout.jsx'
 import PlanSuccess from './pages/PlanSuccess.jsx'
+import Admin from './pages/Admin.jsx'
 
 // ─── Loading screen ───────────────────────────────────────────────────────────
 
@@ -169,6 +170,7 @@ function AppRoutes() {
               <Route path="/plans"     element={<Plans/>}/>
               <Route path="/checkout"  element={<Checkout/>}/>
               <Route path="/plans/success" element={<PlanSuccess/>}/>
+              <Route path="/admin"     element={<Admin/>}/>
             </Route>
           </>
         )}

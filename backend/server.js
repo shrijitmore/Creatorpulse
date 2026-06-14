@@ -1,6 +1,4 @@
-import dotenv from 'dotenv'
-dotenv.config({ path: '.env.development' })
-dotenv.config()
+import './lib/loadEnv.js' // MUST be first — loads .env before any module reads process.env
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
@@ -9,6 +7,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import Redis from 'ioredis'
 import { validateConfig, config } from './lib/config.js'
+import { withStore, closeRateLimitRedis } from './lib/rateLimitStore.js'
 import { logger } from './lib/logger.js'
 import { getDb, closeDb } from './db.js'
 import { clerkMw } from './lib/auth.js'
@@ -21,8 +20,10 @@ import profileRouter from './routes/profile.js'
 import memoryRouter from './routes/memory.js'
 import sceneRouter from './routes/scene.js'
 import recordingRouter from './routes/recording.js'
-import billingRouter from './routes/billing.js'
+import billingRouter, { razorpayWebhookHandler } from './routes/billing.js'
+import adminRouter from './routes/admin.js'
 import nichesRouter from './routes/niches.js'
+import internalRouter from './routes/internal.js'
 
 // Validate all required secrets before anything else starts.
 validateConfig()
@@ -97,7 +98,7 @@ app.use(cors({
 
 // Baseline IP guard — catches bots and scrapers that haven't been fingerprinted yet.
 // 60 req/min is generous for a browser; a scraper hammering the API will hit this.
-const apiLimiter = rateLimit({
+const apiLimiter = rateLimit(withStore('rl:global:', {
   windowMs: 60 * 1000, // 1 minute
   max: 60,
   standardHeaders: true,
@@ -113,11 +114,11 @@ const apiLimiter = rateLimit({
       error: { code: 'RATE_LIMITED', message: 'Too many requests — slow down.' },
     })
   },
-})
+}))
 
 // Auth-path limiter — extra tight for pre-auth routes and billing.
 // Runs in addition to apiLimiter, so effective ceiling is min(20/15min, 60/min).
-const authLimiter = rateLimit({
+const authLimiter = rateLimit(withStore('rl:auth_path:', {
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 20,
   standardHeaders: true,
@@ -132,7 +133,7 @@ const authLimiter = rateLimit({
       error: { code: 'RATE_LIMITED', message: 'Too many requests — try again in 15 minutes.' },
     })
   },
-})
+}))
 
 app.use('/api/', apiLimiter)
 app.use('/api/auth', authLimiter)
@@ -143,6 +144,11 @@ app.use('/api/billing', authLimiter)
 // Audio routes receive base64-encoded recordings (up to ~15 MB of binary).
 // Mount their own parser BEFORE the global 1 mb limit so express-body-parser
 // uses the larger cap for those prefixes and skips re-parsing everywhere else.
+
+// Razorpay webhook needs the raw, unparsed body to verify its HMAC signature.
+// Mount it BEFORE the JSON parser so express.raw captures the bytes intact.
+// Not under /api/billing → skips the auth-path limiter (Razorpay retries events).
+app.post('/api/webhooks/razorpay', express.raw({ type: '*/*' }), razorpayWebhookHandler)
 
 app.use('/api/recording', express.json({ limit: '20mb' }))
 app.use('/api/memory',    express.json({ limit: '20mb' }))
@@ -197,7 +203,12 @@ function initRedis() {
   })
 
   client.connect()
-    .then(() => { startScrapeJob(client) })
+    .then(() => {
+      // In-process timers only when explicitly enabled (single long-lived process).
+      // On serverless, scraping is driven by Cloud Scheduler → /api/internal/scrape.
+      if (config.inProcessCron) startScrapeJob(client)
+      else logger.info('scrapeJob.inprocess_disabled', { hint: 'drive via Cloud Scheduler → POST /api/internal/scrape' })
+    })
     .catch(err => {
       logger.warn('redis.unavailable', { message: err.message })
     })
@@ -312,7 +323,9 @@ app.use('/api/memory', memoryRouter)
 app.use('/api/scene', sceneRouter)
 app.use('/api/recording', recordingRouter)
 app.use('/api/billing', billingRouter)
+app.use('/api/admin', adminRouter)
 app.use('/api/niches', nichesRouter)
+app.use('/api/internal', internalRouter)
 
 // Trends routes
 app.use('/api/trends', trendsRouter)
@@ -555,6 +568,7 @@ async function start() {
           stopScrapeJob()
           await closeDb()
           await redis.quit()
+          await closeRateLimitRedis()
         } catch (_) {}
         logger.info('server.stopped')
         process.exit(0)

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/clerk-react'
+import { Icon } from '../components/ui.jsx'
 
 function useCountUp(target, duration = 1800) {
   const [val, setVal] = useState(0)
@@ -376,21 +377,16 @@ export default function Landing() {
           </div>
           <div className="proc-grid">
             {[
-              { n: '01', title: 'Tell us about you', desc: 'Eight quick questions. Niche, platform, language style, goals. Paste a caption to teach it your voice.' },
-              { n: '02', title: "See what's trending", desc: 'Your personalised trend feed. YouTube + Reddit, scored by viral potential, filtered to your niche.' },
-              { n: '03', title: 'Generate a script', desc: 'Pick a trend. AI writes a full scene-by-scene script in your language. Edit any line with a prompt.' },
-              { n: '04', title: 'Practice and publish', desc: 'Record yourself reading it. AI coaches your delivery. Ship the content.' },
+              { n: '01', title: 'Tell us about you', glyph: Icon.Profile, desc: 'Eight quick questions. Niche, platform, language style, goals. Paste a caption to teach it your voice.' },
+              { n: '02', title: "See what's trending", glyph: Icon.Rising, desc: 'Your personalised trend feed. YouTube + Reddit, scored by viral potential, filtered to your niche.' },
+              { n: '03', title: 'Generate a script', glyph: Icon.Wand, desc: 'Pick a trend. AI writes a full scene-by-scene script in your language. Edit any line with a prompt.' },
+              { n: '04', title: 'Practice and publish', glyph: Icon.Mic, desc: 'Record yourself reading it. AI coaches your delivery. Ship the content.' },
             ].map(s => (
               <div key={s.n} className="proc-step">
                 <span className="proc-n">{s.n}</span>
-                <div style={{ width:40, height:40, borderRadius:10, background:'var(--paper-3)', border:'1px solid var(--line)', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:20 }}>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <rect x="2" y="2" width="12" height="12" rx="3" fill="var(--ink)" opacity=".12"/>
-                    <rect x="5" y="5" width="6" height="6" rx="1.5" fill="var(--ink)"/>
-                  </svg>
-                </div>
-                <p style={{ fontSize:17, fontWeight:500, letterSpacing:'-0.01em', color:'var(--ink)', marginBottom:10 }}>{s.title}</p>
-                <p className="body" style={{ fontSize:13.5 }}>{s.desc}</p>
+                <div className="proc-ic"><s.glyph size={18}/></div>
+                <p className="proc-title">{s.title}</p>
+                <p className="body proc-desc">{s.desc}</p>
               </div>
             ))}
           </div>
@@ -417,7 +413,7 @@ export default function Landing() {
               { title: 'Shipping is a learnable skill', body: 'Delivery confidence comes from reps, not talent. Our coaching catches the small things that kill your authority on camera.' },
             ].map(m => (
               <div key={m.title} className="mani-card">
-                <p style={{ fontSize:22, fontWeight:500, letterSpacing:'-0.02em', lineHeight:1.2, color:'var(--ink)', marginBottom:16 }}>{m.title}</p>
+                <p className="mani-title">{m.title}</p>
                 <p className="body">{m.body}</p>
               </div>
             ))}

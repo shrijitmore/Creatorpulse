@@ -1,17 +1,28 @@
 /**
- * Background scraping job — runs on schedule, populates Redis cache.
- * All users read from cache → zero API calls per user request.
+ * Background scraping job — populates the Redis cache so user requests never
+ * trigger live scraping.
  *
- * Schedule:
- *   viral niches  → every 1h
- *   rising niches → every 5h
- *   new niches    → every 10h
+ * Two ways to drive it:
+ *   - In-process timers (startScrapeJob) — fine for a single long-lived process
+ *     (local dev, or a single always-on instance). Breaks on serverless: timers
+ *     stop when an instance scales to zero, and duplicate across instances.
+ *   - External trigger (runScrapeTier via /api/internal/scrape) — Cloud Scheduler
+ *     hits the endpoint on a schedule. Correct for autoscaling/serverless.
  *
- * Run standalone: node jobs/scrapeJob.js
- * Or call startScrapeJob() from server.js
+ * Tiers:
+ *   fast  → every 1h
+ *   slow  → every 5h
+ *   all   → every 10h
  */
 import { runTrendPipeline } from '../agents/pipeline.js'
 import { NICHES_DEFAULT, CACHE_TTL } from '../constants.js'
+
+// Niche groups by refresh cadence. Single source of truth for both drivers.
+export const SCRAPE_TIERS = {
+  fast: ['fitness', 'tech', 'finance'],
+  slow: ['lifestyle', 'food', 'travel', 'beauty', 'gaming'],
+  all:  NICHES_DEFAULT,
+}
 
 let jobTimers = []
 
@@ -46,7 +57,19 @@ async function scrapeGroup(niches, label, redis) {
 }
 
 /**
- * Start background scraping on schedules.
+ * Scrape and cache one tier. The single entry point used by both the in-process
+ * timers and the external (Cloud Scheduler) endpoint.
+ */
+export async function runScrapeTier(tier, redis) {
+  const niches = SCRAPE_TIERS[tier]
+  if (!niches) throw new Error(`Unknown scrape tier: ${tier}`)
+  return scrapeGroup(niches, `${tier} niches`, redis)
+}
+
+/**
+ * Start in-process scheduled scraping. Use ONLY for a single long-lived process
+ * (local dev or a single always-on instance). For serverless/autoscaling, leave
+ * this off and drive scraping via Cloud Scheduler → /api/internal/scrape.
  * Call from server.js after Redis is connected.
  */
 export function startScrapeJob(redis) {
@@ -55,13 +78,9 @@ export function startScrapeJob(redis) {
     return
   }
 
-  // Split niches into groups — scrape popular niches more frequently
-  const FAST_NICHES = ['fitness', 'tech', 'finance']    // 1h
-  const SLOW_NICHES = ['lifestyle', 'food', 'travel', 'beauty', 'gaming']  // 5h
-
-  const runFast = () => scrapeGroup(FAST_NICHES, 'fast niches', redis)
-  const runSlow = () => scrapeGroup(SLOW_NICHES, 'slow niches', redis)
-  const runAll  = () => scrapeGroup(NICHES_DEFAULT, 'all niches', redis)
+  const runFast = () => runScrapeTier('fast', redis)
+  const runSlow = () => runScrapeTier('slow', redis)
+  const runAll  = () => runScrapeTier('all', redis)
 
   // Initial run on startup (staggered to avoid thundering herd)
   setTimeout(() => runFast(), 5000)
@@ -73,7 +92,7 @@ export function startScrapeJob(redis) {
   const allTimer  = setInterval(runAll,  CACHE_TTL.new * 1000)     // 10h
 
   jobTimers = [fastTimer, slowTimer, allTimer]
-  console.log('[scrapeJob] Background scraping started — fast:1h, slow:5h, all:10h')
+  console.log('[scrapeJob] In-process scraping started — fast:1h, slow:5h, all:10h')
 }
 
 export function stopScrapeJob() {

@@ -10,13 +10,15 @@
  * Per-user keying means an attacker who rotates IPs cannot bypass quotas once
  * authenticated. Account-creation ops key by IP since userId doesn't exist yet.
  *
- * NOTE: The default store is in-memory (per process). For multi-instance
- * production deployments, swap to a Redis store via `rate-limit-redis` so all
- * instances share the same counters.
+ * Counters are shared across instances via a Redis store (see rateLimitStore.js)
+ * when rateLimitUseRedis is enabled — required for multi-instance deployments,
+ * where an in-memory store would let an attacker bypass a quota by spreading
+ * requests across instances. Falls back to in-memory in local dev.
  */
 
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit'
 import { logger } from './logger.js'
+import { withStore, incrWindow } from './rateLimitStore.js'
 
 // ── Key generators ────────────────────────────────────────────────────────────
 
@@ -51,7 +53,7 @@ function handler(label) {
 // 10 full script generations per hour is generous for a real creator;
 // a bot hammering this would be blocked after 10 attempts.
 
-export const aiGenerationLimiter = rateLimit({
+export const aiGenerationLimiter = rateLimit(withStore('rl:ai_gen:', {
   windowMs:            60 * 60 * 1000, // 1 hour
   max:                 10,
   keyGenerator:        byUser,
@@ -59,13 +61,13 @@ export const aiGenerationLimiter = rateLimit({
   legacyHeaders:       false,
   skipSuccessfulRequests: false,
   handler:             handler('ai_generation'),
-})
+}))
 
 // ── AI assist limiter ─────────────────────────────────────────────────────────
 // Scene edit, scene followup, niche interpret, regenerate-section.
 // These are cheaper than full generation but still hit Gemini.
 
-export const aiAssistLimiter = rateLimit({
+export const aiAssistLimiter = rateLimit(withStore('rl:ai_assist:', {
   windowMs:            60 * 60 * 1000, // 1 hour
   max:                 60,
   keyGenerator:        byUser,
@@ -73,12 +75,12 @@ export const aiAssistLimiter = rateLimit({
   legacyHeaders:       false,
   skipSuccessfulRequests: false,
   handler:             handler('ai_assist'),
-})
+}))
 
 // ── Recording analysis limiter ────────────────────────────────────────────────
 // Sends base64 audio to Gemini. Heavy per-request cost.
 
-export const recordingLimiter = rateLimit({
+export const recordingLimiter = rateLimit(withStore('rl:recording:', {
   windowMs:            60 * 60 * 1000, // 1 hour
   max:                 20,
   keyGenerator:        byUser,
@@ -86,12 +88,12 @@ export const recordingLimiter = rateLimit({
   legacyHeaders:       false,
   skipSuccessfulRequests: false,
   handler:             handler('recording'),
-})
+}))
 
 // ── Voice transcription limiter ───────────────────────────────────────────────
 // Base64 audio transcription — similar cost profile to recording.
 
-export const transcribeLimiter = rateLimit({
+export const transcribeLimiter = rateLimit(withStore('rl:transcribe:', {
   windowMs:            60 * 60 * 1000, // 1 hour
   max:                 15,
   keyGenerator:        byUser,
@@ -99,13 +101,13 @@ export const transcribeLimiter = rateLimit({
   legacyHeaders:       false,
   skipSuccessfulRequests: false,
   handler:             handler('transcribe'),
-})
+}))
 
 // ── Trends refresh limiter ────────────────────────────────────────────────────
 // Triggers a full scraping pipeline across Reddit and YouTube.
 // Extremely expensive — very tight limit.
 
-export const trendsRefreshLimiter = rateLimit({
+export const trendsRefreshLimiter = rateLimit(withStore('rl:trends_refresh:', {
   windowMs:            60 * 60 * 1000, // 1 hour
   max:                 5,
   keyGenerator:        byUser,
@@ -113,13 +115,13 @@ export const trendsRefreshLimiter = rateLimit({
   legacyHeaders:       false,
   skipSuccessfulRequests: false,
   handler:             handler('trends_refresh'),
-})
+}))
 
 // ── Account creation limiter ──────────────────────────────────────────────────
 // Onboarding completion creates a user record. Key by IP since userId is new.
 // 5 accounts from the same IP in 15 minutes is a clear bot signal.
 
-export const accountCreationLimiter = rateLimit({
+export const accountCreationLimiter = rateLimit(withStore('rl:account_create:', {
   windowMs:            15 * 60 * 1000, // 15 minutes
   max:                 5,
   keyGenerator:        byIp,
@@ -127,7 +129,7 @@ export const accountCreationLimiter = rateLimit({
   legacyHeaders:       false,
   skipSuccessfulRequests: false,
   handler:             handler('account_creation'),
-})
+}))
 
 // ── Bot UA detection ──────────────────────────────────────────────────────────
 // Blocks requests with no User-Agent on expensive AI endpoints.
@@ -182,9 +184,10 @@ export function requireBrowserLike(req, res, next) {
 // and token-scanning patterns that would otherwise be buried in 401 noise.
 
 const WINDOW_MS  = 10 * 60 * 1000  // 10 minutes
+const WINDOW_SEC = WINDOW_MS / 1000
 const THRESHOLD  = 10               // 10 failures → suspicious
 
-const _failMap = new Map() // ip -> { count, firstAt }
+const _failMap = new Map() // ip -> { count, firstAt }  (in-memory fallback only)
 
 // Prune stale entries every 15 minutes to prevent unbounded memory growth.
 setInterval(() => {
@@ -194,7 +197,7 @@ setInterval(() => {
   }
 }, 15 * 60 * 1000).unref()
 
-export function trackFailedAuth(ip) {
+function trackFailedAuthInMemory(ip) {
   const now   = Date.now()
   const entry = _failMap.get(ip)
 
@@ -204,14 +207,26 @@ export function trackFailedAuth(ip) {
   }
 
   entry.count += 1
+  return entry.count
+}
 
-  if (entry.count === THRESHOLD) {
+/**
+ * Record a failed auth attempt for an IP and return the running count within the
+ * window. Uses a shared Redis counter when enabled so credential-stuffing across
+ * instances is detected as one burst; falls back to per-process memory otherwise.
+ * Advisory only — emits a high-signal log at THRESHOLD, does not block.
+ */
+export async function trackFailedAuth(ip) {
+  let count = await incrWindow(`auth_fail:${ip}`, WINDOW_SEC)
+  if (count == null) count = trackFailedAuthInMemory(ip)
+
+  if (count === THRESHOLD) {
     logger.security('suspicious.auth_burst', {
       ip,
-      count:   entry.count,
-      windowS: WINDOW_MS / 1000,
+      count,
+      windowS: WINDOW_SEC,
     })
   }
 
-  return entry.count
+  return count
 }

@@ -13,6 +13,11 @@ dist
 # Service account JSON if ever saved as a standalone file
 *service_account*.json
 *serviceaccount*.json
+# Cloud Run env-vars files (real values) — keep only the *.example.yaml template
+deploy/env.prod.yaml
+deploy/env.*.yaml
+**/deploy/env.prod.yaml
+!**/deploy/env.*.example.yaml
 
 # Frontend
 frontend/node_modules

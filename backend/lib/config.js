@@ -61,6 +61,22 @@ export const config = {
     password: process.env.REDIS_PASSWORD || '',
   },
 
+  // Redis-backed rate limiting. Required once you run more than one app instance —
+  // in-memory counters are per-process, so N instances = N× the configured limit.
+  // Prod: on by default (set RATE_LIMIT_REDIS=false to opt out, e.g. single instance).
+  // Dev:  off by default (set RATE_LIMIT_REDIS=true to test the Redis path locally).
+  rateLimitUseRedis: IS_PROD
+    ? process.env.RATE_LIMIT_REDIS !== 'false'
+    : process.env.RATE_LIMIT_REDIS === 'true',
+
+  // In-process scrape timers. Safe only for a single long-lived process.
+  // Prod: OFF by default — drive scraping via Cloud Scheduler → /api/internal/scrape
+  //   (set INPROCESS_CRON=true only if running a single always-on instance).
+  // Dev:  ON by default (set INPROCESS_CRON=false to disable).
+  inProcessCron: IS_PROD
+    ? process.env.INPROCESS_CRON === 'true'
+    : process.env.INPROCESS_CRON !== 'false',
+
   razorpay: {
     keyId:     process.env.RAZORPAY_KEY_ID     || '',
     keySecret: process.env.RAZORPAY_KEY_SECRET || '',
