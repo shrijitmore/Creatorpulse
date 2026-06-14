@@ -34,11 +34,6 @@ export const SIGNAL_FILTER_OPTS = [
 
 // Scraping limits
 export const SCRAPING = {
-  ig_hashtags_per_niche:    2,   // Instagram hashtags to search per niche
-  ig_max_hashtags:          8,   // Max total Instagram hashtags per run
-  ig_results_limit:         12,  // Posts to fetch per hashtag
-  ig_top_posts_per_run:     8,   // Max Instagram posts to keep after dedup
-  ig_rate_limit_delay_ms:   1500, // Min delay between IG requests
   yt_results_per_niche:     5,   // YouTube videos per niche
   reddit_posts_per_search:  4,   // Reddit posts from search
   reddit_hot_per_sub:       3,   // Reddit hot posts from subreddit
@@ -58,15 +53,4 @@ export const SCORING = {
     engagement_max_boost: 60,
     base_score:           30,
   },
-  instagram: {
-    base_score:           30,
-    recency_2h:           25,
-    recency_12h:          18,
-    recency_24h:          12,
-    recency_72h:          6,
-    video_bonus:          18,
-    sidecar_bonus:        8,
-    hashtag_sweet_spot:   12,  // 10-25 hashtags
-    max_score:            96,
-  }
 }

@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 import { generateScript, regenerateSection } from '../lib/api.js'
 
 const INITIAL_STEPS = [
-  { step: 1, label: 'Scraping Instagram & Reddit...', icon: '🔍', status: 'pending' },
+  { step: 1, label: 'Scraping YouTube & Reddit...', icon: '🔍', status: 'pending' },
   { step: 2, label: 'Analysing trends...', icon: '📊', status: 'pending' },
   { step: 3, label: 'Writing your script...', icon: '✍️', status: 'pending' },
   { step: 4, label: 'Generating hooks & copy...', icon: '🎣', status: 'pending' }

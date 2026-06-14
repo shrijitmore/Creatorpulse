@@ -3,14 +3,12 @@
  */
 
 export const PLATFORMS = [
-  { id: 'instagram', label: 'Instagram', scraper: 'apify+session' },
   { id: 'youtube',   label: 'YouTube',   scraper: 'data-api' },
   { id: 'reddit',    label: 'Reddit',    scraper: 'public-api' },
 ]
 
 export const PLATFORM_FILTER_OPTS = [
   { id: 'all',       label: 'All' },
-  { id: 'instagram', label: 'Instagram' },
   { id: 'reddit',    label: 'Reddit' },
   { id: 'youtube',   label: 'YouTube' },
 ]

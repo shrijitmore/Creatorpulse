@@ -207,7 +207,7 @@ export default function Landing() {
         <div className="wrap">
           <div className="ln-meta">
             <span className="status">Live · scanning now</span>
-            <span className="dim">Instagram · YouTube · Reddit</span>
+            <span className="dim">YouTube · Reddit</span>
             <span className="ts dim">2026</span>
           </div>
           <h1 className="ln-display">
@@ -240,7 +240,7 @@ export default function Landing() {
             <div className="ln-imgframe"><VelocityViz/></div>
             <div className="ln-imgmeta">
               <span>Creatorpulse · Dashboard</span>
-              <span>Live signals · 3 platforms</span>
+              <span>Live signals · 2 platforms</span>
             </div>
           </div>
         </div>
@@ -281,13 +281,13 @@ export default function Landing() {
               <div className="f-ix"><span>01</span><span>Trend Intelligence</span></div>
               <h3>See what's going viral before everyone else</h3>
               <p className="body" style={{ marginTop: 16 }}>
-                Scans Instagram, YouTube, and Reddit every hour. Scores each signal by
+                Scans YouTube and Reddit every hour. Scores each signal by
                 engagement velocity, topic freshness, and cross-platform momentum.
               </p>
               <div className="f-tags">
-                <span className="chip active">Instagram</span>
                 <span className="chip active">YouTube</span>
                 <span className="chip active">Reddit</span>
+                <span className="chip">Instagram (soon)</span>
                 <span className="chip">TikTok (soon)</span>
               </div>
             </div>
@@ -377,7 +377,7 @@ export default function Landing() {
           <div className="proc-grid">
             {[
               { n: '01', title: 'Tell us about you', desc: 'Eight quick questions. Niche, platform, language style, goals. Paste a caption to teach it your voice.' },
-              { n: '02', title: "See what's trending", desc: 'Your personalised trend feed. Instagram + YouTube + Reddit, scored by viral potential, filtered to your niche.' },
+              { n: '02', title: "See what's trending", desc: 'Your personalised trend feed. YouTube + Reddit, scored by viral potential, filtered to your niche.' },
               { n: '03', title: 'Generate a script', desc: 'Pick a trend. AI writes a full scene-by-scene script in your language. Edit any line with a prompt.' },
               { n: '04', title: 'Practice and publish', desc: 'Record yourself reading it. AI coaches your delivery. Ship the content.' },
             ].map(s => (
@@ -412,7 +412,7 @@ export default function Landing() {
           </div>
           <div className="mani-grid">
             {[
-              { title: "Research shouldn't take 4 hours", body: "You spend more time finding what to make than actually making it. We scan three platforms every hour so you don't have to." },
+              { title: "Research shouldn't take 4 hours", body: "You spend more time finding what to make than actually making it. We scan multiple platforms every hour so you don't have to." },
               { title: 'Scripts should sound like you', body: "Generic AI output is obvious. We train on your past captions and writing to write scripts that sound like you on your best day." },
               { title: 'Shipping is a learnable skill', body: 'Delivery confidence comes from reps, not talent. Our coaching catches the small things that kill your authority on camera.' },
             ].map(m => (
@@ -446,7 +446,7 @@ export default function Landing() {
               {
                 tier: 'Pro', price: '₹999', per: '/month',
                 desc: 'For creators who ship consistently.',
-                features: ['Unlimited scripts', 'All platforms + languages', 'Instagram trends', 'AI voice coaching', 'Priority scraping', 'Script history'],
+                features: ['Unlimited scripts', 'All languages', 'Cross-platform trend signals', 'AI voice coaching', 'Priority scraping', 'Script history'],
                 cta: 'Start Pro (coming soon)', hero: true,
               },
               {

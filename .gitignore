@@ -31,3 +31,7 @@ Thumbs.db:encryptable
 # IDE
 .vscode/settings.json
 .idea/
+
+# Claude Code — personal/local config only (commit shared commands/agents if added)
+.claude/settings.local.json
+.claude/*.local.json

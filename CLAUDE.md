@@ -200,7 +200,7 @@ import { useTrends } from '@/features/dashboard/hooks/useTrends'
 | AI Agents | LangGraph.js + Gemini 2.5 Flash (Vertex AI) |
 | Database | Supabase (PostgreSQL + pgvector) / PGlite (dev) |
 | Cache | Redis (ioredis) — dynamic TTL by signal type |
-| Scraping | Instagram session cookie + YouTube Data API v3 + Reddit public API |
+| Scraping | YouTube Data API v3 + Reddit public API |
 
 ---
 

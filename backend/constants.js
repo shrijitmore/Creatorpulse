@@ -33,11 +33,6 @@ export const CACHE_TTL = {
 }
 
 export const SCRAPING = {
-  ig_hashtags_per_niche:    2,
-  ig_max_hashtags:          8,
-  ig_results_limit:         12,
-  ig_top_posts_per_run:     8,
-  ig_rate_limit_delay_ms:   1500,
   yt_results_per_niche:     5,
   reddit_posts_per_search:  4,
   reddit_hot_per_sub:       3,
@@ -61,14 +56,6 @@ export const GEMINI = {
 export const SCORING = {
   youtube: { log_mult: 12, base: 20 },
   reddit:  { divisor: 30000, max_boost: 60, base: 30 },
-  instagram: {
-    base: 30,
-    recency: { h2: 25, h12: 18, h24: 12, h72: 6 },
-    video_bonus: 18,
-    sidecar_bonus: 8,
-    hashtag_bonus: 12,
-    max: 96,
-  }
 }
 
 export const NICHE_IG_HASHTAGS = {

@@ -339,11 +339,6 @@ const scrollTo = (id) => {
                   { name: 'GOOGLE_SERVICE_ACCOUNT_JSON', desc: 'Service account JSON (Vertex AI permissions)' },
                   { name: 'GEMINI_MODEL',                desc: 'Model name, e.g. gemini-2.5-flash' },
                 ]},
-                { section: 'Instagram Scraping', keys: [
-                  { name: 'APIFY_API_KEY',           desc: 'Apify account API key' },
-                  { name: 'INSTAGRAM_SESSION_ID',    desc: 'IG session cookie (alternative to Apify)' },
-                  { name: 'INSTAGRAM_CSRF_TOKEN',    desc: 'IG CSRF token' },
-                ]},
                 { section: 'YouTube + Reddit', keys: [
                   { name: 'YOUTUBE_API_KEY',     desc: 'YouTube Data API v3 key' },
                   { name: 'REDDIT_CLIENT_ID',    desc: 'Reddit OAuth app client ID (optional)' },

@@ -3,25 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 
 const PLATFORM_BADGES = {
-  instagram: {
-    label: 'Instagram',
+  youtube: {
+    label: 'YouTube',
     icon: (
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-        <defs>
-          <linearGradient id="ig-grad" x1="0%" y1="100%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#f09433"/>
-            <stop offset="25%" stopColor="#e6683c"/>
-            <stop offset="50%" stopColor="#dc2743"/>
-            <stop offset="75%" stopColor="#cc2366"/>
-            <stop offset="100%" stopColor="#bc1888"/>
-          </linearGradient>
-        </defs>
-        <rect x="2" y="2" width="20" height="20" rx="5" ry="5" fill="url(#ig-grad)"/>
-        <circle cx="12" cy="12" r="4" stroke="white" strokeWidth="1.8" fill="none"/>
-        <circle cx="17.5" cy="6.5" r="1.2" fill="white"/>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+        <rect x="2" y="5" width="20" height="14" rx="4" fill="#FF0000"/>
+        <path d="M10 8.5l6 3.5-6 3.5v-7z" fill="white"/>
       </svg>
     ),
-    color: '#e6683c'
+    color: '#FF0000'
   },
   x: {
     label: 'X / Twitter',
@@ -67,7 +57,7 @@ export default function TrendCard({ trend, index = 0, featured = false }) {
   const [hovering, setHovering] = useState(false)
   const [btnHover, setBtnHover] = useState(false)
 
-  const platform = PLATFORM_BADGES[trend.platform] || PLATFORM_BADGES.instagram
+  const platform = PLATFORM_BADGES[trend.platform] || PLATFORM_BADGES.youtube
   const signal = SIGNAL_CONFIG[trend.signal] || SIGNAL_CONFIG.new
 
   const handleGenerate = () => {

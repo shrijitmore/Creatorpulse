@@ -102,7 +102,7 @@ export const transcribeLimiter = rateLimit({
 })
 
 // ── Trends refresh limiter ────────────────────────────────────────────────────
-// Triggers a full scraping pipeline across Reddit, YouTube, Instagram.
+// Triggers a full scraping pipeline across Reddit and YouTube.
 // Extremely expensive — very tight limit.
 
 export const trendsRefreshLimiter = rateLimit({

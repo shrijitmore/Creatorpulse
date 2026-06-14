@@ -7,7 +7,7 @@ import { getNiche } from '../constants/niches.js'
 import NichePicker from '../features/dashboard/components/NichePicker.jsx'
 
 const PLATFORM_OPTS = [
-  { id: 'all', label: 'All' }, { id: 'instagram', label: 'Instagram' },
+  { id: 'all', label: 'All' },
   { id: 'reddit', label: 'Reddit' }, { id: 'youtube', label: 'YouTube' },
 ]
 const SIGNAL_OPTS = [
@@ -17,7 +17,6 @@ const SIGNAL_OPTS = [
 const FETCH_STEPS = [
   { id: 'reddit',    label: 'Scanning Reddit',         duration: 8000  },
   { id: 'youtube',   label: 'Pulling YouTube trends',  duration: 10000 },
-  { id: 'instagram', label: 'Reading Instagram',       duration: 10000 },
   { id: 'ai',        label: 'AI ranking signals',      duration: 99999 },
 ]
 const SIGNAL_COLORS = { viral: '#E23B3B', rising: 'var(--pulse)', new: '#8B6FDE' }
@@ -278,7 +277,7 @@ export default function Dashboard() {
     }
     for (const p in byPlatform) byPlatform[p].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
     const picks = []
-    for (const p of ['instagram', 'youtube', 'reddit']) {
+    for (const p of ['youtube', 'reddit']) {
       if (byPlatform[p]) picks.push(...byPlatform[p].slice(0, 2))
     }
     return picks.slice(0, 6)
