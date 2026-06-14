@@ -1,6 +1,7 @@
 name: Deploy backend to Cloud Run
 
 # Auto-deploys the backend on push to main when backend code changes.
+# CI pipeline verified live.
 # Env vars/secrets are NOT set here — they already live on the Cloud Run service
 # and are preserved across deploys, so CI only ships code (no secrets in GitHub).
 on:
