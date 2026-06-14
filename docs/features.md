@@ -30,10 +30,10 @@
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Trend feed | ✅ | Instagram + YouTube + Reddit |
+| Trend feed | ✅ | YouTube + Reddit |
 | Real-time filtering (niche/platform/signal) | ✅ | Client-side, instant |
 | Creator Brief banner | ✅ | Shows voice, goal, script count |
-| Editor's picks (2 per platform) | ✅ | Balanced Instagram/YouTube/Reddit |
+| Editor's picks (2 per platform) | ✅ | Balanced YouTube/Reddit |
 | Signal sparklines | ✅ | Visual trend shape |
 | Refresh with cache bypass | ✅ | Hits backend, invalidates Redis |
 | **Platform-weighted scraping** | 📋 | User's primary platform gets 60% of scraping budget |
@@ -125,7 +125,7 @@
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Niche preferences (edit) | ✅ | Updates DB + localStorage |
-| API keys section | ✅ | Vertex AI, Apify, Supabase |
+| API keys section | ✅ | Vertex AI, YouTube, Supabase |
 | Account display | ✅ | From Clerk |
 | **Language preference** | ✅ | Saves to profile, affects script generation |
 | **Content format preference** | ✅ | Saves to profile |
@@ -159,7 +159,7 @@
 |---------|------|-----|--------|
 | Scripts/month | 5 | Unlimited | Unlimited |
 | Recording + AI coaching | ❌ | ✅ | ✅ |
-| Instagram trends | ❌ | ✅ | ✅ |
+| Cross-platform trend signals | ❌ | ✅ | ✅ |
 | Regional languages | ❌ | ✅ | ✅ |
 | Creator profiles | 1 | 1 | Multiple |
 | Priority scraping | ❌ | ✅ | ✅ |
@@ -198,7 +198,6 @@ Layer 4 — Background scraping job
 | Script with profile cache | ~$0.0008 |
 | Recording analysis (Gemini audio) | ~$0.05-0.10 |
 | YouTube API (shared cache) | ~$0.0001 per user |
-| Instagram (session cookie) | $0 |
 | Reddit | $0 |
 
 At 100 Pro users: ~$5-8/month AI costs + infrastructure.

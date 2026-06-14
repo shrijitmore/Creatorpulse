@@ -191,10 +191,15 @@ function Sidebar({ onCommand }) {
 
         {/* User */}
         <div className="side-user" onClick={() => navigate('/profile')} style={{ cursor: 'pointer' }}>
-          <div className="avatar" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="avatar">
             <UserButton
               afterSignOutUrl="/sign-in"
-              appearance={{ elements: { avatarBox: 'w-full h-full', userButtonBox: 'w-full h-full' } }}
+              appearance={{
+                elements: {
+                  userButtonTrigger: { width: '36px', height: '36px', padding: 0 },
+                  avatarBox: { width: '36px', height: '36px' },
+                }
+              }}
             />
           </div>
           <span style={{ flex: 1, overflow: 'hidden' }}>

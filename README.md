@@ -6,7 +6,7 @@
 
 ## What it does
 
-1. **Trend Discovery** — Scans Instagram, YouTube, and Reddit every hour. Surfaces trending topics filtered to your niche, in your language.
+1. **Trend Discovery** — Scans YouTube and Reddit every hour. Surfaces trending topics filtered to your niche, in your language.
 2. **Script Generation** — 4-agent AI pipeline writes full reel scripts (30s/60s/90s) that sound like you — Hinglish, regional languages, your tone.
 3. **Per-Scene Editing** — Click any scene element, tell the AI what to change. It reasons, warns about cascading changes, and lets you iterate with a followup chain.
 4. **Voice Coaching** — Record yourself reading the script scene by scene. AI analyses words, filler words, confidence, energy, emotion, and voice raise.
@@ -24,7 +24,7 @@
 | AI Agents | LangGraph.js + Gemini 2.5 Flash (Vertex AI) |
 | Database | Supabase (PostgreSQL + pgvector) / PGlite (dev) |
 | Cache | Redis — shared niche cache, dynamic TTL |
-| Scraping | Instagram session cookie · YouTube Data API v3 · Reddit public API |
+| Scraping | YouTube Data API v3 · Reddit public API |
 
 ---
 
@@ -87,9 +87,6 @@ DATABASE_URL=postgresql://postgres.xxx:password@aws-0-region.pooler.supabase.com
 
 # Scraping
 YOUTUBE_API_KEY=AIza...
-INSTAGRAM_SESSION_ID=your_session_id
-INSTAGRAM_CSRF_TOKEN=your_csrf_token
-APIFY_API_KEY=apify_api_...
 
 # Auth
 CLERK_SECRET_KEY=sk_test_...
@@ -135,8 +132,6 @@ npm run dev
 |-----|-------|
 | Gemini / Vertex AI | [console.cloud.google.com](https://console.cloud.google.com) → Enable Vertex AI → Service Account → JSON key |
 | YouTube Data API | [console.cloud.google.com](https://console.cloud.google.com) → APIs → YouTube Data API v3 → Create API Key |
-| Apify (Instagram) | [console.apify.com](https://console.apify.com/account/integrations) |
-| Instagram session | Log into Instagram in browser → DevTools → Application → Cookies → copy `sessionid` + `csrftoken` |
 | Clerk | [clerk.com](https://clerk.com) → Create application → API Keys → grab Secret Key |
 | Supabase DATABASE_URL | [supabase.com](https://supabase.com) → Project → Settings → Database → Connection string → **Transaction pooler** (port 6543) |
 
@@ -148,7 +143,7 @@ npm run dev
 
 ```
 User selects topic
-  → Agent 1: Scrape (Instagram + YouTube + Reddit in parallel)
+  → Agent 1: Scrape (YouTube + Reddit in parallel)
   → Agent 2: Trend Analyst (Gemini — score virality, clean titles, detect niches)
   → Agent 3: Script Writer (Gemini — scene-by-scene script in creator's language)
   → Agent 4: Hook & Copy (Gemini — 3 hook variants, caption, hashtags, thumbnail text)
@@ -208,7 +203,7 @@ Gemini profile cache (memory, 1h)
 See [`docs/features.md`](docs/features.md) for full status of every feature.
 
 **Built:**
-- ✅ Trend feed — 3 platforms, shared cache, dynamic TTL
+- ✅ Trend feed — YouTube + Reddit, shared cache, dynamic TTL
 - ✅ Script generation — 4-agent pipeline, language-aware
 - ✅ Per-scene AI editing with followup chain + cascading warnings
 - ✅ Script diff view (original vs edited)

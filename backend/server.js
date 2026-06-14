@@ -393,7 +393,7 @@ app.get('/docs', (req, res) => {
     <div class="endpoint">
       <div class="endpoint-header">
         <span class="method get">GET</span>
-        <span class="endpoint-path">/api/trends?niches=fitness,tech&amp;platforms=instagram,reddit</span>
+        <span class="endpoint-path">/api/trends?niches=fitness,tech&amp;platforms=youtube,reddit</span>
         <span class="endpoint-desc">Fetch trending topics</span>
       </div>
       <div class="endpoint-body">
@@ -409,7 +409,7 @@ app.get('/docs', (req, res) => {
       </div>
       <div class="endpoint-body">
         <div class="label">Request</div>
-        <pre>{ "niches": ["fitness", "tech"], "platforms": ["instagram", "reddit"] }</pre>
+        <pre>{ "niches": ["fitness", "tech"], "platforms": ["youtube", "reddit"] }</pre>
       </div>
     </div>
   </div>
