@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react'
 import { Icon, Button, Chip, Modal } from '../../components/ui.jsx'
-import { getAuthHeaders } from '../../lib/apiClient.js'
+import { analyseRecording, followupScene } from '../../lib/api.js'
 
 const SCORE_COLOR = (s) => s >= 8 ? 'var(--success)' : s >= 6 ? 'var(--terra)' : 'var(--error)'
 const SCORE_LABEL = (s) => s >= 8 ? 'Strong' : s >= 6 ? 'Good' : 'Needs work'
@@ -77,23 +77,14 @@ export default function RecordingStudio({ open, onClose, script }) {
     reader.onloadend = async () => {
       const base64 = reader.result.split(',')[1]
       try {
-        const res = await fetch('/api/recording/analyse', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${await getToken()}`,
-          },
-          body: JSON.stringify({
-            audioBase64: base64,
-            mimeType: 'audio/webm',
-            sceneText: scene?.voiceover || '',
-            sceneNumber: scene?.sceneNumber,
-            scriptTone: script.tone,
-            niche: script.niche,
-          })
+        const feedback = await analyseRecording({
+          audioBase64: base64,
+          mimeType: 'audio/webm',
+          sceneText: scene?.voiceover || '',
+          sceneNumber: scene?.sceneNumber,
+          scriptTone: script.tone,
+          niche: script.niche,
         })
-        const data = await res.json()
-        const feedback = data.data || data
         setCurrentFeedback(feedback)
         setRecordings(prev => ({ ...prev, [scene.sceneNumber]: { blob, feedback } }))
         setPhase('feedback')
@@ -110,33 +101,20 @@ export default function RecordingStudio({ open, onClose, script }) {
     setCoachLoading(true)
     setCoachAnswer(null)
     try {
-      const headers = await getAuthHeaders()
-      const res = await fetch('/api/scene/followup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...headers },
-        body: JSON.stringify({
-          previousSuggestion: JSON.stringify(currentFeedback),
-          followupPrompt: coachQuestion.trim(),
-          element: 'delivery',
-          tone: script?.tone,
-          niche: script?.niche,
-        })
+      const data = await followupScene({
+        previousSuggestion: JSON.stringify(currentFeedback),
+        followupPrompt: coachQuestion.trim(),
+        element: 'delivery',
+        tone: script?.tone,
+        niche: script?.niche,
       })
-      const data = await res.json()
-      setCoachAnswer(data.data?.suggestion || data.suggestion || 'No suggestion returned.')
+      setCoachAnswer(data?.suggestion || 'No suggestion returned.')
     } catch {
       setCoachAnswer('Could not reach the AI coach. Check your connection.')
     } finally {
       setCoachLoading(false)
     }
   }, [coachQuestion, currentFeedback, script])
-
-  const getToken = async () => {
-    try {
-      const headers = await getAuthHeaders()
-      return (headers.Authorization || '').replace('Bearer ', '')
-    } catch { return '' }
-  }
 
   // ── Navigation ──────────────────────────────────────────────────────────────
 

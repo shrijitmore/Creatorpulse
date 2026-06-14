@@ -1,23 +1,43 @@
 import { getAuthHeaders } from './apiClient.js'
 
-const BASE_URL = import.meta.env.VITE_API_URL || ''
+// Strip trailing slash(es) so buildUrl never produces `//api` (a common env typo).
+const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '')
+
+const DEFAULT_TIMEOUT_MS = 30000
 
 function buildUrl(path) {
   return `${BASE_URL}${path}`
 }
 
+/**
+ * Single fetch wrapper for every API call.
+ * - Prepends VITE_API_URL (never relative — works on Netlify/prod).
+ * - Hard timeout via AbortController so no loader spins forever.
+ *   Override per-call with options.timeoutMs (e.g. slow audio analysis).
+ */
 async function apiFetch(path, options = {}) {
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, ...fetchOpts } = options
   const url = buildUrl(path)
   const authHeaders = await getAuthHeaders()
-  const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...authHeaders, ...options.headers },
-    ...options
-  })
-  if (!res.ok) {
-    const text = await res.text().catch(() => 'Unknown error')
-    throw new Error(`API ${res.status}: ${text}`)
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(url, {
+      ...fetchOpts,
+      headers: { 'Content-Type': 'application/json', ...authHeaders, ...(fetchOpts.headers || {}) },
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      const text = await res.text().catch(() => 'Unknown error')
+      throw new Error(`API ${res.status}: ${text}`)
+    }
+    return res.json()
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)}s`)
+    throw err
+  } finally {
+    clearTimeout(timer)
   }
-  return res.json()
 }
 
 // ─── Trends ──────────────────────────────────────────────────────────────────
@@ -34,6 +54,30 @@ export async function refreshTrends(niches = [], platforms = []) {
   const data = await apiFetch('/api/trends/refresh', {
     method: 'POST',
     body: JSON.stringify({ niches, platforms })
+  })
+  return data.data || data
+}
+
+// ─── Recording studio ──────────────────────────────────────────────────────────
+
+export async function analyseRecording({ audioBase64, mimeType = 'audio/webm', sceneText, sceneNumber, scriptTone, niche }) {
+  const data = await apiFetch('/api/recording/analyse', {
+    method: 'POST',
+    body: JSON.stringify({ audioBase64, mimeType, sceneText, sceneNumber, scriptTone, niche }),
+    timeoutMs: 60000, // Gemini audio analysis is slower than a normal request
+  })
+  return data.data || data
+}
+
+export async function getRecordingStats() {
+  const data = await apiFetch('/api/recording/stats')
+  return data.data || data
+}
+
+export async function markScriptUsed(scriptId, engagementScore) {
+  const data = await apiFetch('/api/profile/mark-used', {
+    method: 'POST',
+    body: JSON.stringify({ scriptId, engagementScore }),
   })
   return data.data || data
 }

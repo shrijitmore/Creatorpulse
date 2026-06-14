@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Icon, Chip } from '../../components/ui.jsx'
-import { getAuthHeaders } from '../../lib/apiClient.js'
+import { getRecordingStats } from '../../lib/api.js'
 
 const METRICS = [
   { key: 'overall_score',    label: 'Overall',    color: 'var(--terra)' },
@@ -51,10 +51,8 @@ export default function DeliveryGrowth() {
   useEffect(() => {
     const load = async () => {
       try {
-        const headers = await getAuthHeaders()
-        const res = await fetch('/api/recording/stats', { headers })
-        const data = await res.json()
-        setSessions(data.data?.sessions || [])
+        const data = await getRecordingStats()
+        setSessions(data.sessions || [])
       } catch { setSessions([]) }
       finally { setLoading(false) }
     }

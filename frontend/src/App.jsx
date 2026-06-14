@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import { useAuth } from './lib/auth.jsx'
 import { ToastProvider, Logomark } from './components/ui.jsx'
 import { setTokenGetter } from './lib/apiClient.js'
+import { getOnboardingStatus } from './lib/api.js'
 import Layout from './components/Layout.jsx'
 import Landing from './pages/Landing.jsx'
 import Onboarding from './pages/Onboarding.jsx'
@@ -65,15 +66,11 @@ function useOnboardingGate() {
     getToken()
       .then(token => {
         if (!token) throw new Error('No token yet')
-        return fetch('/api/onboarding/status', {
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
-        })
+        return getOnboardingStatus()
       })
-      .then(r => { if (!r.ok) throw new Error(`Status ${r.status}`); return r.json() })
-      .then(data => {
+      .then(d => {
         if (cancelled) return
         resolvedRef.current = true
-        const d = data.data || data
         if (d.completed) {
           if (d.niches?.length) localStorage.setItem('trendforge_niches', JSON.stringify(d.niches))
           if (d.profile) {

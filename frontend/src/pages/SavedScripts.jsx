@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getSavedScripts, deleteScript } from '../lib/api.js'
-import { getAuthHeaders } from '../lib/apiClient.js'
+import { getSavedScripts, deleteScript, markScriptUsed } from '../lib/api.js'
 import { NICHES } from '../lib/mockData.js'
 
 const NICHE_ICON = Object.fromEntries(NICHES.map(n => [n.id, n.icon]))
@@ -26,12 +25,7 @@ function EngagementInput({ scriptId, onSave }) {
     if (!score) return
     setSaving(true)
     try {
-      const headers = await getAuthHeaders()
-      await fetch('/api/profile/mark-used', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...headers },
-        body: JSON.stringify({ scriptId, engagementScore: parseInt(score) })
-      })
+      await markScriptUsed(scriptId, parseInt(score))
       setSaved(true); onSave?.()
     } catch {}
     finally { setSaving(false) }
