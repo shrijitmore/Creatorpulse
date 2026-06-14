@@ -34,13 +34,29 @@ export function validateConfig() {
   logger.info('config.validated', { env: 'production' })
 }
 
+// Normalise TRUST_PROXY into the shape Express expects.
+//   unset  → 1 hop in prod (Cloud Run / one reverse proxy), false in dev
+//   "true" → true (trust all)  |  "false"/"0" → false
+//   numeric → Number (hop count)  |  anything else → passed through (IP/subnet list)
+function parseTrustProxy(raw, isProd) {
+  if (raw === undefined || raw === '') return isProd ? 1 : false
+  if (raw === 'true')  return true
+  if (raw === 'false') return false
+  const n = Number(raw)
+  return Number.isInteger(n) ? n : raw
+}
+
 // Typed access to every config value the app needs.
 // Components import from here instead of reading process.env directly.
 export const config = {
   isProd:      IS_PROD,
   port:        parseInt(process.env.PORT, 10) || 3000,
   frontendUrl: process.env.FRONTEND_URL || '',
-  trustProxy:  process.env.TRUST_PROXY  || (IS_PROD ? '1' : false),
+  // Trust proxy: MUST be a number (hop count) or boolean — Express treats a STRING
+  // as a list of trusted IPs, so app.set('trust proxy', '1') silently breaks req.ip
+  // (it then reports the proxy's address, not the client's). Cloud Run = 1 hop.
+  // 'true' → trust all; numeric string → hop count; else pass through (IP/subnet list).
+  trustProxy:  parseTrustProxy(process.env.TRUST_PROXY, IS_PROD),
 
   clerk: {
     secretKey:      process.env.CLERK_SECRET_KEY      || '',

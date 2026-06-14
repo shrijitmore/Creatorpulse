@@ -1,0 +1,20 @@
+# Controls what `gcloud run deploy --source` uploads to Cloud Build.
+# Secrets are injected at runtime via --env-vars-file, never uploaded/baked.
+
+# Secrets — never upload
+.env
+.env.*
+*.env
+deploy/env.prod.yaml
+deploy/env.*.yaml
+!deploy/env.*.example.yaml
+
+# Dependencies — Dockerfile runs npm ci; uploading these bloats the build context
+node_modules
+
+# Noise
+*.log
+.git
+.gitignore
+.vscode
+.idea
