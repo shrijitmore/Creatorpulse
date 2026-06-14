@@ -14,7 +14,7 @@ const DEV_USER = {
   id: 'dev-user',
   fullName: 'Alex Romero',
   firstName: 'Alex',
-  primaryEmailAddress: { emailAddress: 'alex@trendforge.io' },
+  primaryEmailAddress: { emailAddress: 'alex@influensa.in' },
   imageUrl: null,
 }
 

@@ -167,7 +167,7 @@ export default function AgentProgress({ steps, onCancel }) {
           className="mt-8 text-center text-xs font-mono"
           style={{ color: '#3f3f46' }}
         >
-          POWERED BY TRENDFORGE AI ENGINE
+          POWERED BY INFLUENSA AI ENGINE
         </p>
       </div>
 

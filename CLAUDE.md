@@ -1,4 +1,4 @@
-# Creatorpulse — Engineering Rules
+# Influensa — Engineering Rules
 
 ## Project Overview
 AI-powered content intelligence platform for solo creators.
@@ -9,7 +9,7 @@ Frontend: `frontend/` (Vite/React) | Backend: `backend/` (Express/Node.js)
 ## Architecture
 
 ```
-creatorpulse/
+influensa/
 ├── frontend/          # Vite + React 18 + custom CSS
 │   └── src/
 │       ├── features/  # studio/, profile/, onboarding/
@@ -72,9 +72,9 @@ score > 80 ? 'viral' : 'rising'
 const niches = ['fitness', 'finance', 'tech']
 
 // ✅ CORRECT
-import { COLORS, SIGNAL_THRESHOLDS, NICHES } from '@/constants'
+import { COLORS, SIGNAL_THRESHOLD, NICHES } from '@/constants'
 <div style={{ color: COLORS.terra }}>
-score > SIGNAL_THRESHOLDS.viral ? 'viral' : 'rising'
+score > SIGNAL_THRESHOLD.viral ? 'viral' : 'rising'
 ```
 
 ### 2. NO duplicate components

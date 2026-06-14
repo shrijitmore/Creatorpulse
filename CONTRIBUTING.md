@@ -1,16 +1,16 @@
-# Contributing to Creatorpulse
+# Contributing to Influensa
 
 ## Before You Start
 
-- Check [open issues](https://github.com/shrijitmore/Creatorpulse/issues) to avoid duplicate work
+- Check [open issues](https://github.com/shrijitmore/Influensa/issues) to avoid duplicate work
 - For large features, open an issue first to discuss the approach
 - Read [CLAUDE.md](./CLAUDE.md) — all coding rules are there
 
 ## Setup
 
 ```bash
-git clone https://github.com/shrijitmore/Creatorpulse.git
-cd Creatorpulse
+git clone https://github.com/shrijitmore/Influensa.git
+cd Influensa
 
 # Backend
 cd backend && npm install
@@ -56,4 +56,4 @@ cp .env.example .env.local
 
 ## Questions
 
-Open a [GitHub Discussion](https://github.com/shrijitmore/Creatorpulse/discussions) or comment on the relevant issue.
+Open a [GitHub Discussion](https://github.com/shrijitmore/Influensa/discussions) or comment on the relevant issue.

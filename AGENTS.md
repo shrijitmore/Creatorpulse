@@ -1,4 +1,4 @@
-# Creatorpulse — Engineering Rules
+# Influensa — Engineering Rules
 
 ## Project Overview
 AI-powered content intelligence platform for solo creators.
@@ -9,7 +9,7 @@ Frontend: `frontend/` (Vite/React) | Backend: `backend/` (Express/Node.js)
 ## Architecture
 
 ```
-creatorpulse/
+influensa/
 ├── frontend/          # Vite + React 18 + custom CSS
 │   └── src/
 │       ├── features/  # studio/, profile/, onboarding/

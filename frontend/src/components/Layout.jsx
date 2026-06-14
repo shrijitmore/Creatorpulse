@@ -109,7 +109,7 @@ function CommandPalette({ open, onClose }) {
           <span className="small mono" style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>↑↓ navigate</span>
           <span className="small mono" style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>↵ select</span>
           <span style={{ flex: 1 }}/>
-          <span className="small" style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>Creatorpulse</span>
+          <span className="small" style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>Influensa</span>
         </div>
       </div>
     </div>
@@ -133,7 +133,7 @@ function Sidebar({ onCommand }) {
   return (
     <aside className="side">
       {/* Brand */}
-      <a className="brand" href="/"><span className="mark"/>Creatorpulse</a>
+      <a className="brand" href="/"><span className="mark"/>Influensa</a>
 
       {/* Navigation */}
       <nav className="side-nav">

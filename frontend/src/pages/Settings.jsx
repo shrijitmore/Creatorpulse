@@ -149,7 +149,7 @@ const scrollTo = (id) => {
           <div className="set-block" ref={el => sectionRefs.current['account'] = el} id="account">
             <span className="kicker">Account</span>
             <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)', marginTop: 4, marginBottom: 4 }}>Your identity</h2>
-            <p className="body">How you appear in Creatorpulse and how the AI addresses you.</p>
+            <p className="body">How you appear in Influensa and how the AI addresses you.</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--line)' }}>
               <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--ink)', color: 'var(--paper)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 600, flexShrink: 0 }}>
                 {initials}
@@ -279,7 +279,7 @@ const scrollTo = (id) => {
           <div className="set-block" ref={el => sectionRefs.current['notifications'] = el} id="notifications">
             <span className="kicker">Notifications</span>
             <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)', marginTop: 4, marginBottom: 4 }}>Notification preferences</h2>
-            <p className="body">Control when and how Creatorpulse nudges you.</p>
+            <p className="body">Control when and how Influensa nudges you.</p>
             <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 0 }}>
               {[
                 { label: 'Daily trend digest', sub: 'Morning summary of top signals in your niches', val: notifDailyDigest, set: v => { setNotifDailyDigest(v); saveNotifications({ dailyDigest: v }) } },
@@ -365,7 +365,7 @@ const scrollTo = (id) => {
 
           {/* App info */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', border: '1px solid var(--line-2)', borderRadius: 12, background: 'var(--paper-2)' }}>
-            <span style={{ fontSize: 11.5, color: 'var(--mute)', fontFamily: 'var(--mono)' }}>Creatorpulse · v1.0.0 · MVP Build</span>
+            <span style={{ fontSize: 11.5, color: 'var(--mute)', fontFamily: 'var(--mono)' }}>Influensa · v1.0.0 · MVP Build</span>
             <span style={{ fontSize: 11.5, color: 'var(--mute)', fontFamily: 'var(--mono)' }}>Gemini 2.5 Flash · Vertex AI · LangGraph</span>
           </div>
 

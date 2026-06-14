@@ -612,7 +612,7 @@ export default function Onboarding() {
     <div className="onb">
       {/* Top bar */}
       <div className="onb-top">
-        <a className="brand" href="/"><span className="mark"/>Creatorpulse</a>
+        <a className="brand" href="/"><span className="mark"/>Influensa</a>
         <div className="onb-progress">
           <div className="onb-bar">
             <span className="onb-bar-fill" style={{ width: `${progress * 100}%` }}/>

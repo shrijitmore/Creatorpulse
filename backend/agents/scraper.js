@@ -88,10 +88,10 @@ async function scrapeReddit(niches, platforms, results) {
     try {
       const [searchRes, subRes] = await Promise.all([
         fetch(`https://www.reddit.com/search.json?q=${encodeURIComponent(niche)}&sort=top&limit=8&type=link&t=week`, {
-          headers: { 'User-Agent': 'TrendForge/1.0' }, signal: AbortSignal.timeout(10000)
+          headers: { 'User-Agent': 'Influensa/1.0' }, signal: AbortSignal.timeout(10000)
         }),
         fetch(`https://www.reddit.com/r/${(NICHE_SUBREDDITS[niche] || [niche])[0]}/hot.json?limit=5`, {
-          headers: { 'User-Agent': 'TrendForge/1.0' }, signal: AbortSignal.timeout(8000)
+          headers: { 'User-Agent': 'Influensa/1.0' }, signal: AbortSignal.timeout(8000)
         })
       ])
 

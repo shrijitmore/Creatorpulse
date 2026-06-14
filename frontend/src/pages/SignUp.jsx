@@ -9,7 +9,7 @@ export default function SignUpPage() {
         <div className="auth-main" style={{ order: 1 }}>
           <div style={{ width: '100%', maxWidth: 500, overflow: 'visible' }}>
             <div style={{ marginBottom: 32 }}>
-              <a className="brand" href="/" style={{ marginBottom: 32, display: 'inline-flex' }}><span className="mark"/>Creatorpulse</a>
+              <a className="brand" href="/" style={{ marginBottom: 32, display: 'inline-flex' }}><span className="mark"/>Influensa</a>
               <span className="kicker" style={{ display: 'block', marginTop: 24 }}>Get started free</span>
               <h1 style={{ fontSize: 28, fontWeight: 500, letterSpacing: '-0.02em', color: 'var(--ink)', marginTop: 10 }}>Create your account</h1>
             </div>
@@ -45,7 +45,7 @@ export default function SignUpPage() {
         <div className="auth-side reverse" style={{ order: 2 }}>
           <div/>
           <div className="auth-quote">
-            <p>"Creatorpulse is the unfair advantage I wish I had when I started. Every trend, every script, every coaching note in one place."</p>
+            <p>"Influensa is the unfair advantage I wish I had when I started. Every trend, every script, every coaching note in one place."</p>
             <div className="row" style={{ gap: 12, marginTop: 28 }}>
               <div className="auth-avatar"/>
               <div>

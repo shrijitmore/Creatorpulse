@@ -174,7 +174,7 @@ export default function Landing() {
       <nav className="ln-nav">
         <div className="wrap">
           <div className="row between" style={{ height: 64 }}>
-            <a className="brand" href="/"><span className="mark"/>Creatorpulse</a>
+            <a className="brand" href="/"><span className="mark"/>Influensa</a>
             <nav className="ln-links">
               <a href="#features">Features</a>
               <a href="#process">How it works</a>
@@ -240,7 +240,7 @@ export default function Landing() {
             <div className="ln-orb iri"/>
             <div className="ln-imgframe"><VelocityViz/></div>
             <div className="ln-imgmeta">
-              <span>Creatorpulse · Dashboard</span>
+              <span>Influensa · Dashboard</span>
               <span>Live signals · 2 platforms</span>
             </div>
           </div>
@@ -403,7 +403,7 @@ export default function Landing() {
             </div>
             <p className="body">
               Every tool we've seen treats the creator as an afterthought.
-              We built Creatorpulse for the people who show up every day.
+              We built Influensa for the people who show up every day.
             </p>
           </div>
           <div className="mani-grid">
@@ -481,7 +481,7 @@ export default function Landing() {
             Ready to let AI do the research?
           </h2>
           <p className="body" style={{ maxWidth: 480, margin: '20px auto 0' }}>
-            Join 70,000+ creators who use Creatorpulse to surface trends and ship faster.
+            Join 70,000+ creators who use Influensa to surface trends and ship faster.
           </p>
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: 40 }}>
             <button className="btn btn-primary btn-xl" onClick={() => navigate('/sign-up')}>
@@ -496,9 +496,9 @@ export default function Landing() {
       <footer className="ln-foot">
         <div className="wrap">
           <div className="row between">
-            <a className="brand" href="/"><span className="mark"/>Creatorpulse</a>
+            <a className="brand" href="/"><span className="mark"/>Influensa</a>
             <div className="row" style={{ gap: 24, fontSize: 13, color: 'var(--mute)' }}>
-              <span>© 2026 Creatorpulse</span>
+              <span>© 2026 Influensa</span>
               <span>Gemini 2.5 Flash · Vertex AI</span>
             </div>
           </div>

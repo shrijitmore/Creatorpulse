@@ -1,5 +1,5 @@
 {
-  "name": "creatorpulse",
+  "name": "influensa",
   "private": true,
   "scripts": {
     "dev:frontend": "cd frontend && npm run dev",

@@ -82,7 +82,7 @@ export default function PlanSuccess() {
 
         <p style={{ fontSize: 12, color: 'var(--mute)', marginTop: 20 }}>
           A confirmation email is on its way. Questions?{' '}
-          <a href="mailto:hello@creatorpulse.in" style={{ color: 'var(--ink)', textDecoration: 'none' }}>hello@creatorpulse.in</a>
+          <a href="mailto:hello@influensa.in" style={{ color: 'var(--ink)', textDecoration: 'none' }}>hello@influensa.in</a>
         </p>
       </div>
     </div>

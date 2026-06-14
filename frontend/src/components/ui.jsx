@@ -76,7 +76,7 @@ export function Wordmark({ withTag = false }) {
     <div className="flex items-center gap-2">
       <Logomark size={28} />
       <div className="flex flex-col leading-none">
-        <span className="font-semibold text-[15px] tracking-[-0.01em] text-ink">creatorpulse</span>
+        <span className="font-semibold text-[15px] tracking-[-0.01em] text-ink">influensa</span>
         {withTag && <span className="text-[10px] text-ink3 mt-0.5 tracking-[0.04em]">your AI cofounder for content</span>}
       </div>
     </div>

@@ -7,7 +7,7 @@ export default function SignInPage() {
       <div className="auth-grid">
         {/* Left rail */}
         <div className="auth-side">
-          <a className="brand" href="/"><span className="mark"/>Creatorpulse</a>
+          <a className="brand" href="/"><span className="mark"/>Influensa</a>
           <div className="auth-quote">
             <p>"The difference between creators who grow and creators who plateau is knowing what to make before they make it."</p>
             <div className="row" style={{ gap: 12, marginTop: 28 }}>
@@ -31,7 +31,7 @@ export default function SignInPage() {
           <div style={{ width: '100%', maxWidth: 460, overflow: 'visible' }}>
             <div style={{ marginBottom: 32 }}>
               <span className="kicker">Welcome back</span>
-              <h1 style={{ fontSize: 28, fontWeight: 500, letterSpacing: '-0.02em', color: 'var(--ink)', marginTop: 10 }}>Sign in to Creatorpulse</h1>
+              <h1 style={{ fontSize: 28, fontWeight: 500, letterSpacing: '-0.02em', color: 'var(--ink)', marginTop: 10 }}>Sign in to Influensa</h1>
             </div>
             <SignIn
               signUpUrl="/sign-up"

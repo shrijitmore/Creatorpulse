@@ -73,7 +73,7 @@ export default function Checkout() {
       const options = {
         key: sub.keyId,
         subscription_id: sub.subscriptionId,
-        name: 'Creatorpulse',
+        name: 'Influensa',
         description: `${plan.name} · ${cycle === 'yearly' ? 'Yearly' : 'Monthly'}`,
         prefill: {
           name: user?.fullName || '',
@@ -163,7 +163,7 @@ export default function Checkout() {
             <div style={{ padding: '20px 24px' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 20 }}>
                 <div>
-                  <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>Creatorpulse {plan.name}</p>
+                  <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>Influensa {plan.name}</p>
                   <p style={{ fontSize: 13, color: 'var(--mute)', marginTop: 3 }}>Billed {cycle === 'yearly' ? 'annually' : 'monthly'} · auto-renews</p>
                 </div>
                 <div style={{ textAlign: 'right' }}>

@@ -414,7 +414,7 @@ export default function Dashboard() {
       )}
 
       <div style={{ marginTop: 56, paddingTop: 20, borderTop: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span className="small mono">Creatorpulse · {filtered.length} signals · synced {lastUpdated ? lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</span>
+        <span className="small mono">Influensa · {filtered.length} signals · synced {lastUpdated ? lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</span>
         <button className="btn btn-ghost btn-sm" onClick={handleChangeNiche}>Switch niche →</button>
       </div>
     </div>

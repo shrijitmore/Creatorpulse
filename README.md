@@ -1,4 +1,4 @@
-# Creatorpulse
+# Influensa
 
 **AI-powered content intelligence for solo creators.** Discover viral trends, generate scripts in your voice, and get coached on your delivery.
 
@@ -31,7 +31,7 @@
 ## Project structure
 
 ```
-creatorpulse/
+influensa/
 ├── frontend/          # Vite + React 18
 │   ├── src/
 │   │   ├── constants/ # theme, niches, platforms, signals (no hardcoded values)
@@ -61,8 +61,8 @@ creatorpulse/
 ### 1. Clone
 
 ```bash
-git clone https://github.com/shrijitmore/Creatorpulse.git
-cd Creatorpulse
+git clone https://github.com/shrijitmore/Influensa.git
+cd Influensa
 ```
 
 ### 2. Backend

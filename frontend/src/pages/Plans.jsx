@@ -128,8 +128,8 @@ export default function Plans() {
         <div style={{ textAlign: 'center', marginTop: 64 }}>
           <p style={{ fontSize: 13, color: 'var(--mute)', lineHeight: 1.6 }}>
             Questions? Email us at{' '}
-            <a href="mailto:hello@creatorpulse.in" style={{ color: 'var(--ink)', textDecoration: 'none', fontWeight: 500 }}>
-              hello@creatorpulse.in
+            <a href="mailto:hello@influensa.in" style={{ color: 'var(--ink)', textDecoration: 'none', fontWeight: 500 }}>
+              hello@influensa.in
             </a>
           </p>
         </div>
