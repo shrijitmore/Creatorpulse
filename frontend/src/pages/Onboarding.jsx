@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useUser } from '@clerk/clerk-react'
+import { useAuth } from '../lib/auth.jsx'
 import { updateNiches, completeOnboarding, transcribeVoice } from '../lib/api.js'
 import { CONTENT_FORMATS, LANGUAGE_STYLES, CREATOR_GOALS } from '../constants/platforms.js'
 
@@ -494,7 +494,7 @@ function Launching({ name }) {
 
 export default function Onboarding() {
   const navigate = useNavigate()
-  const { isSignedIn } = useUser()
+  const { isSignedIn } = useAuth()
   const [step, setStep] = useState(0)
   const [phase, setPhase] = useState('asking') // 'asking' | 'processing' | 'welcome'
   const [answers, setAnswers] = useState({})

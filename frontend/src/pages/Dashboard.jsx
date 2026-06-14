@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useUser } from '@clerk/clerk-react'
+import { useAuth } from '../lib/auth.jsx'
 import { useTrends } from '../features/dashboard/hooks/useTrends.js'
 import { getProfile } from '../lib/api.js'
 import { getNiche } from '../constants/niches.js'
@@ -96,7 +96,7 @@ function SumCard({ label, value, sub }) {
 
 function CreatorBrief({ apiProfile, stats }) {
   const navigate = useNavigate()
-  const { user } = useUser()
+  const { user } = useAuth()
   const storedProfile = useMemo(() => {
     try { return JSON.parse(localStorage.getItem('trendforge_profile') || '{}') } catch { return {} }
   }, [])

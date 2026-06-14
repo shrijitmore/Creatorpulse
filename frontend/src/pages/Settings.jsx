@@ -353,8 +353,8 @@ const scrollTo = (id) => {
                 <div key={group.section} style={{ marginBottom: 24 }}>
                   <p style={{ fontSize: 11, fontFamily: 'var(--mono)', letterSpacing: '0.07em', color: 'var(--mute)', textTransform: 'uppercase', marginBottom: 10 }}>{group.section}</p>
                   {group.keys.map(k => (
-                    <div key={k.name} style={{ display: 'flex', alignItems: 'baseline', gap: 12, padding: '7px 0', borderTop: '1px solid var(--line-2)' }}>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--ink)', minWidth: 220, flexShrink: 0 }}>{k.name}</span>
+                    <div key={k.name} style={{ display: 'flex', alignItems: 'baseline', gap: 12, padding: '7px 0', borderTop: '1px solid var(--line-2)', flexWrap: 'wrap' }}>
+                      <span className="set-env-key">{k.name}</span>
                       <span style={{ fontSize: 12, color: 'var(--mute)' }}>{k.desc}</span>
                     </div>
                   ))}

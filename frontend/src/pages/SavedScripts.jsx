@@ -75,9 +75,11 @@ function ScriptRow({ script, onDelete, onOpen }) {
         {script.wasUsed ? 'Posted' : 'Draft'}
         {script.engagementScore && <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink)' }}>{script.engagementScore}</span>}
       </div>
-      {showEngagement
-        ? <EngagementInput scriptId={script.id} onSave={() => setShowEngagement(false)}/>
-        : <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--mute)', padding: '4px 10px', border: '1px solid var(--line)', borderRadius: 999 }}>{script.format} reel</span>}
+      <div className="saved-col-fmt">
+        {showEngagement
+          ? <EngagementInput scriptId={script.id} onSave={() => setShowEngagement(false)}/>
+          : <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--mute)', padding: '4px 10px', border: '1px solid var(--line)', borderRadius: 999 }}>{script.format} reel</span>}
+      </div>
       <span className="tag" style={{ fontFamily: 'var(--mono)', textAlign: 'right' }}>{timeAgo(script.createdAt)}</span>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} onClick={e => e.stopPropagation()}>
@@ -148,7 +150,7 @@ function PerformanceFeedback({ scripts }) {
         <p style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)' }}>Performance feedback loop</p>
         <span className="chip" style={{ fontSize: 10 }}>{posted.length} posted</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 14 }}>
+      <div className="perf-grid">
         {[
           { label: 'Scripts posted', value: posted.length },
           { label: 'With score', value: withScore.length },
@@ -270,9 +272,9 @@ export default function SavedScripts() {
 
       {/* List header */}
       {!loading && filtered.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 200px 160px 160px 40px', gap: 16, padding: '0 0 10px', borderBottom: '1px solid var(--line)', marginBottom: 0 }}>
-          {['#', 'Title', 'Performance', 'Format', 'When', ''].map(h => (
-            <span key={h} className="label" style={{ marginBottom: 0, fontSize: 10 }}>{h}</span>
+        <div className="saved-header">
+          {['#', 'Title', 'Performance', 'Format', 'When', ''].map((h, i) => (
+            <span key={h} className={`label ${[2, 3, 4].includes(i) ? 'saved-col-hide' : ''}`} style={{ marginBottom: 0, fontSize: 10 }}>{h}</span>
           ))}
         </div>
       )}
@@ -281,10 +283,13 @@ export default function SavedScripts() {
       <div className="saved-list">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} style={{ display: 'grid', gridTemplateColumns: '60px 1fr 200px 160px 160px 40px', gap: 16, padding: '16px 0', borderBottom: '1px solid var(--line-2)' }}>
-              {[36, 200, 100, 80, 60, 30].map((w, j) => (
-                <div key={j} style={{ height: 14, width: '100%', background: 'var(--paper-3)', borderRadius: 4, animation: 'none', opacity: 0.5 }}/>
-              ))}
+            <div key={i} className="saved-row" style={{ cursor: 'default' }}>
+              <div style={{ height: 14, background: 'var(--paper-3)', borderRadius: 4, opacity: 0.5 }}/>
+              <div style={{ height: 14, background: 'var(--paper-3)', borderRadius: 4, opacity: 0.5 }}/>
+              <div style={{ height: 14, background: 'var(--paper-3)', borderRadius: 4, opacity: 0.5 }} className="pf"/>
+              <div style={{ height: 14, background: 'var(--paper-3)', borderRadius: 4, opacity: 0.5 }} className="saved-col-fmt"/>
+              <div style={{ height: 14, background: 'var(--paper-3)', borderRadius: 4, opacity: 0.5 }} className="tag"/>
+              <div style={{ height: 14, background: 'var(--paper-3)', borderRadius: 4, opacity: 0.5 }}/>
             </div>
           ))
         ) : filtered.length === 0 ? (

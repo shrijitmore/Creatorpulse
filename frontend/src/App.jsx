@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
-import { useAuth, useUser } from '@clerk/clerk-react'
+import { useAuth } from './lib/auth.jsx'
 import { ToastProvider, Logomark } from './components/ui.jsx'
 import { setTokenGetter } from './lib/apiClient.js'
 import Layout from './components/Layout.jsx'
@@ -47,8 +47,7 @@ function NotFound() {
 // ─── Onboarding gate — checks DB, not just localStorage ──────────────────────
 
 function useOnboardingGate() {
-  const { isSignedIn, isLoaded } = useUser()
-  const { getToken } = useAuth()
+  const { isSignedIn, isLoaded, getToken } = useAuth()
   const [state, setState] = useState({ checking: true, onboarded: false })
   const resolvedRef = useRef(false)
 
@@ -103,8 +102,7 @@ function useOnboardingGate() {
 // ─── App routes ───────────────────────────────────────────────────────────────
 
 function AppRoutes() {
-  const { isSignedIn, isLoaded } = useUser()
-  const { getToken } = useAuth()
+  const { isSignedIn, isLoaded, getToken } = useAuth()
   const navigate = useNavigate()
   const [clerkTimedOut, setClerkTimedOut] = useState(false)
 

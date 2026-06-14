@@ -13,7 +13,15 @@ export const clerkMw = clerkMiddleware()
 export async function requireAuth(req, res, next) {
   if (!process.env.CLERK_SECRET_KEY) {
     // Dev-only bypass — validateConfig() in server.js exits before this runs in production.
-    req.userId = process.env.DEV_USER_ID || 'dev-user-1'
+    const userId = process.env.DEV_USER_ID || 'dev-user-1'
+    req.userId = userId
+    try {
+      const db = await getDb()
+      await db.query(
+        `INSERT INTO users (id, email) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING`,
+        [userId, `${userId}@dev.local`]
+      )
+    } catch {}
     return next()
   }
 
@@ -81,7 +89,15 @@ export async function requireAuth(req, res, next) {
 
 export async function optionalAuth(req, res, next) {
   if (!process.env.CLERK_SECRET_KEY) {
-    req.userId = process.env.DEV_USER_ID || 'dev-user-1'
+    const userId = process.env.DEV_USER_ID || 'dev-user-1'
+    req.userId = userId
+    try {
+      const db = await getDb()
+      await db.query(
+        `INSERT INTO users (id, email) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING`,
+        [userId, `${userId}@dev.local`]
+      )
+    } catch {}
     return next()
   }
   const auth = getAuth(req)

@@ -108,11 +108,7 @@ export default function Plans() {
         </div>
 
         {/* Trust indicators */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 40,
-          padding: '20px 0', marginBottom: 72,
-          borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)',
-        }}>
+        <div className="trust-row">
           {trustBadges}
         </div>
 

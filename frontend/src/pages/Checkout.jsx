@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { useUser } from '@clerk/clerk-react'
+import { useAuth } from '../lib/auth.jsx'
 import { Icon } from '../components/ui.jsx'
 import { PLANS } from '../constants/plans.js'
 import { COLORS } from '../constants/theme.js'
@@ -20,7 +20,7 @@ function loadRazorpay() {
 export default function Checkout() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const { user } = useUser()
+  const { user } = useAuth()
 
   const planId = params.get('plan') || 'pro'
   const [cycle, setCycle] = useState(params.get('cycle') === 'yearly' ? 'yearly' : 'monthly')

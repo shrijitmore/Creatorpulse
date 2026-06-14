@@ -185,7 +185,7 @@ export default function Profile() {
       </div>
 
       {/* Grid layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 20 }}>
+      <div className="prof-2col">
 
         {/* Left column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

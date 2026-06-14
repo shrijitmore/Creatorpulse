@@ -220,7 +220,7 @@ export default function Landing() {
                 Your AI cofounder for content. Discovers what's trending in your niche,
                 writes scripts in your voice, and coaches you on delivery.
               </p>
-              <div className="row" style={{ gap: 12, marginTop: 32 }}>
+              <div className="ln-hero-cta">
                 <button className="btn btn-primary btn-lg" onClick={() => navigate('/sign-up')}>
                   Start for free <span className="arrow">→</span>
                 </button>

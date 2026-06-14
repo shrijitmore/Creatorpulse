@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { ClerkProvider } from '@clerk/clerk-react'
 import './design.css'
 import App from './App.jsx'
+import { DevAuthProvider, ClerkBridge } from './lib/auth.jsx'
 
 // Remove stale api-keys that were previously stored in localStorage.
 // Secrets must never live in the browser — they belong in backend/.env only.
@@ -16,11 +17,17 @@ if (!PUBLISHABLE_KEY) {
 
 function Root() {
   if (!PUBLISHABLE_KEY) {
-    return <App/>
+    return (
+      <DevAuthProvider>
+        <App/>
+      </DevAuthProvider>
+    )
   }
   return (
     <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/sign-in">
-      <App/>
+      <ClerkBridge>
+        <App/>
+      </ClerkBridge>
     </ClerkProvider>
   )
 }

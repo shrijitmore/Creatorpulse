@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useLocation, Outlet } from 'react-router-dom'
-import { UserButton, useUser, useClerk } from '@clerk/clerk-react'
+import { UserButton, useClerk } from '@clerk/clerk-react'
+import { useAuth, CLERK_ENABLED } from '../lib/auth.jsx'
 import { TrendsProvider } from '../context/TrendsContext.jsx'
 import { COLORS } from '../constants/theme.js'
 import { useRecentScripts } from '../hooks/useRecentScripts.js'
@@ -65,6 +66,9 @@ function CommandPalette({ open, onClose }) {
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Command palette"
       style={{ position: 'fixed', inset: 0, zIndex: 80, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '14vh', paddingLeft: 16, paddingRight: 16, background: 'rgba(10,10,10,0.28)', backdropFilter: 'blur(2px)' }}
       onMouseDown={onClose}>
       <div
@@ -116,13 +120,37 @@ function CommandPalette({ open, onClose }) {
   )
 }
 
+// ─── Clerk-specific UI components (only rendered inside ClerkProvider) ────────
+
+function ClerkUserBtn() {
+  return (
+    <UserButton
+      afterSignOutUrl="/sign-in"
+      appearance={{ elements: { userButtonTrigger: { width: '36px', height: '36px', padding: 0 }, avatarBox: { width: '36px', height: '36px' } } }}
+    />
+  )
+}
+
+function ClerkSignOutBtn() {
+  const { signOut } = useClerk()
+  return (
+    <button
+      onClick={() => signOut({ redirectUrl: '/sign-in' })}
+      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, fontSize: 13, color: 'var(--mute)', transition: 'all var(--tx-fast)', width: '100%' }}
+      onMouseEnter={e => { e.currentTarget.style.background = `${COLORS.error}14`; e.currentTarget.style.color = COLORS.error }}
+      onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = 'var(--mute)' }}>
+      <span>↩</span>
+      <span className="side-label">Sign out</span>
+    </button>
+  )
+}
+
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
 
-function Sidebar({ onCommand }) {
+function Sidebar({ onCommand, open, onClose, sideRef }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user } = useUser()
-  const { signOut } = useClerk()
+  const { user } = useAuth()
   const name = user?.fullName || user?.firstName || 'Creator'
   const email = user?.primaryEmailAddress?.emailAddress || ''
 
@@ -130,8 +158,14 @@ function Sidebar({ onCommand }) {
   const { isAdmin } = useMe()
   const navItems = isAdmin ? [...NAV, { to: '/admin', label: 'Admin', icon: '⚑' }] : NAV
 
+  const go = (path) => { navigate(path); onClose?.() }
+
   return (
-    <aside className="side">
+    <aside
+      ref={sideRef}
+      id="app-sidebar"
+      aria-label="Main navigation"
+      className={`side ${open ? 'mob-open' : ''}`}>
       {/* Brand */}
       <a className="brand" href="/"><span className="mark"/>Influensa</a>
 
@@ -143,7 +177,7 @@ function Sidebar({ onCommand }) {
             <button
               key={to}
               className={`side-link ${active ? 'on' : ''}`}
-              onClick={() => navigate(to)}>
+              onClick={() => go(to)}>
               <span className="ic">{icon}</span>
               <span className="side-label">{label}</span>
             </button>
@@ -153,7 +187,7 @@ function Sidebar({ onCommand }) {
         <div className="hr" style={{ margin: '12px 0' }}/>
 
         {/* Quick action */}
-        <button className="side-link" onClick={onCommand}>
+        <button className="side-link" onClick={() => { onCommand(); onClose?.() }}>
           <span className="ic">⌕</span>
           <span className="side-label" style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
             Search
@@ -168,7 +202,7 @@ function Sidebar({ onCommand }) {
               <button
                 key={s.id}
                 title={s.topicTitle}
-                onClick={() => navigate(`/studio?topicId=${s.topicId || s.id}&title=${encodeURIComponent(s.topicTitle)}&niche=${encodeURIComponent(s.niche || '')}`)}
+                onClick={() => go(`/studio?topicId=${s.topicId || s.id}&title=${encodeURIComponent(s.topicTitle)}&niche=${encodeURIComponent(s.niche || '')}`)}
                 onMouseEnter={e => { e.currentTarget.style.background = 'var(--paper-2)'; e.currentTarget.style.color = 'var(--ink)' }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--mute)' }}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 10px', borderRadius: 7, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--mute)', fontFamily: 'var(--sans)', fontSize: 12.5, textAlign: 'left', transition: 'background 0.18s, color 0.18s', overflow: 'hidden' }}>
@@ -194,17 +228,12 @@ function Sidebar({ onCommand }) {
         </div>
 
         {/* User */}
-        <div className="side-user" onClick={() => navigate('/profile')} style={{ cursor: 'pointer' }}>
+        <div className="side-user" onClick={() => go('/profile')} style={{ cursor: 'pointer' }}>
           <div className="avatar">
-            <UserButton
-              afterSignOutUrl="/sign-in"
-              appearance={{
-                elements: {
-                  userButtonTrigger: { width: '36px', height: '36px', padding: 0 },
-                  avatarBox: { width: '36px', height: '36px' },
-                }
-              }}
-            />
+            {CLERK_ENABLED
+              ? <ClerkUserBtn/>
+              : <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', userSelect: 'none' }}>{name.charAt(0)}</span>
+            }
           </div>
           <span style={{ flex: 1, overflow: 'hidden' }}>
             <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</p>
@@ -212,14 +241,19 @@ function Sidebar({ onCommand }) {
           </span>
         </div>
 
-        <button
-          onClick={() => signOut({ redirectUrl: '/sign-in' })}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, fontSize: 13, color: 'var(--mute)', transition: 'all var(--tx-fast)', width: '100%' }}
-          onMouseEnter={e => { e.currentTarget.style.background = `${COLORS.error}14`; e.currentTarget.style.color = COLORS.error }}
-          onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = 'var(--mute)' }}>
-          <span>↩</span>
-          <span className="side-label">Sign out</span>
-        </button>
+        {CLERK_ENABLED
+          ? <ClerkSignOutBtn/>
+          : (
+            <button
+              onClick={() => navigate('/sign-in')}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, fontSize: 13, color: 'var(--mute)', transition: 'all var(--tx-fast)', width: '100%' }}
+              onMouseEnter={e => { e.currentTarget.style.background = `${COLORS.error}14`; e.currentTarget.style.color = COLORS.error }}
+              onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = 'var(--mute)' }}>
+              <span>↩</span>
+              <span className="side-label">Sign out</span>
+            </button>
+          )
+        }
       </div>
     </aside>
   )
@@ -227,26 +261,37 @@ function Sidebar({ onCommand }) {
 
 // ─── Topbar ──────────────────────────────────────────────────────────────────
 
-function Topbar({ onCommand }) {
+function Topbar({ onCommand, onMenu, menuRef, sideOpen }) {
   const location = useLocation()
   const t = ROUTE_TITLES[location.pathname] || ROUTE_TITLES['/dashboard']
 
   return (
-    <header style={{ height: 56, display: 'flex', alignItems: 'center', gap: 16, padding: '0 24px', borderBottom: '1px solid var(--line)', background: 'var(--paper)', position: 'sticky', top: 0, zIndex: 30 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
+    <header style={{ height: 56, display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px 0 16px', borderBottom: '1px solid var(--line)', background: 'var(--paper)', position: 'sticky', top: 0, zIndex: 30 }}>
+      {/* Hamburger — visible only on mobile via CSS */}
+      <button
+        ref={menuRef}
+        className="mob-menu-btn"
+        onClick={onMenu}
+        aria-label={sideOpen ? 'Close navigation' : 'Open navigation'}
+        aria-expanded={sideOpen}
+        aria-controls="app-sidebar"
+      >☰</button>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, flexShrink: 0 }}>
         <span style={{ color: 'var(--mute)' }}>{t.kicker}</span>
         <span style={{ color: 'var(--mute-2)' }}>›</span>
         <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{t.title}</span>
       </div>
       <div style={{ flex: 1 }}/>
       <button
+        className="topbar-search"
         onClick={onCommand}
-        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--paper-2)', fontSize: 13, color: 'var(--mute)', cursor: 'pointer', flex: '0 1 320px' }}>
+        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--paper-2)', fontSize: 13, color: 'var(--mute)', cursor: 'pointer' }}>
         <span>⌕</span>
         <span style={{ flex: 1, textAlign: 'left' }}>Search trends, scripts…</span>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>⌘K</span>
       </button>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, border: '1px solid var(--line)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, border: '1px solid var(--line)', flexShrink: 0 }}>
         <span className="status" style={{ fontSize: 0 }}/>{/* uses status::before for dot */}
         <span style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--ink-2)', fontFamily: 'var(--mono)', letterSpacing: '0.06em' }}>LIVE</span>
       </div>
@@ -258,6 +303,24 @@ function Topbar({ onCommand }) {
 
 export default function Layout() {
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [sideOpen, setSideOpen] = useState(false)
+  const hamburgerRef = useRef(null)
+  const sideRef = useRef(null)
+
+  // Scroll-lock body when mobile drawer is open
+  useEffect(() => {
+    if (sideOpen) document.body.classList.add('sidebar-open')
+    else document.body.classList.remove('sidebar-open')
+    return () => document.body.classList.remove('sidebar-open')
+  }, [sideOpen])
+
+  // Move focus into sidebar on open; return it to hamburger on Escape
+  useEffect(() => {
+    if (sideOpen) {
+      const first = sideRef.current?.querySelector('a, button, [tabindex]:not([tabindex="-1"])')
+      first?.focus()
+    }
+  }, [sideOpen])
 
   useEffect(() => {
     const onKey = (e) => {
@@ -265,17 +328,44 @@ export default function Layout() {
         e.preventDefault()
         setPaletteOpen(v => !v)
       }
+      if (e.key === 'Escape') {
+        setSideOpen(false)
+        hamburgerRef.current?.focus()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  const closeSidebar = useCallback(() => {
+    setSideOpen(false)
+    hamburgerRef.current?.focus()
+  }, [])
+
   return (
     <TrendsProvider>
       <div className="app-shell">
-        <Sidebar onCommand={() => setPaletteOpen(true)}/>
+        <Sidebar
+          onCommand={() => setPaletteOpen(true)}
+          open={sideOpen}
+          onClose={closeSidebar}
+          sideRef={sideRef}
+        />
+        {/* Overlay backdrop — only renders on mobile when drawer is open */}
+        {sideOpen && (
+          <div
+            className="sidebar-overlay active"
+            onClick={closeSidebar}
+            aria-hidden="true"
+          />
+        )}
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: '100vh' }}>
-          <Topbar onCommand={() => setPaletteOpen(true)}/>
+          <Topbar
+            onCommand={() => setPaletteOpen(true)}
+            onMenu={() => setSideOpen(v => !v)}
+            menuRef={hamburgerRef}
+            sideOpen={sideOpen}
+          />
           <main style={{ flex: 1, overflowY: 'auto' }}>
             <Outlet/>
           </main>
