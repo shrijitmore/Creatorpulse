@@ -9,7 +9,17 @@ import { buildCreatorContext } from '../lib/memory.js'
 import { storeScriptEmbedding, trackTopic } from '../lib/embeddings.js'
 import { aiGenerationLimiter, aiAssistLimiter, requireBrowserLike } from '../lib/limiters.js'
 import { effectivePlan, planLimits } from '../lib/plan.js'
+import { TIMEOUTS } from '../constants.js'
 import { logger } from '../lib/logger.js'
+
+// Races a promise against a fallback value — used so a hung upstream call
+// (Vertex auth, Gemini) degrades to a default instead of holding the SSE open forever.
+function withTimeout(promise, ms, fallback) {
+  return Promise.race([
+    promise,
+    new Promise(resolve => setTimeout(() => resolve(fallback), ms)),
+  ])
+}
 import { validate, sanitizeText, VALID_TONES, VALID_FORMATS, VALID_SECTIONS, NICHE_RE } from '../lib/validate.js'
 
 const router = Router()
@@ -38,22 +48,25 @@ router.post(
   }),
   async (req, res) => {
   // Enforce the monthly script quota by effective plan (free = 5/month, paid = unlimited).
-  // Runs before SSE headers so a 402 JSON response is still valid.
+  // Runs before SSE headers so a 402 JSON response is still valid. This is a fast-fail
+  // pre-check only — the authoritative check is the conditional INSERT below, which
+  // closes the race window where concurrent requests could all pass this count.
+  let scriptLimit = Infinity
   try {
     const db = await getDb()
     const userRow = (await db.query('SELECT plan, plan_expires_at FROM users WHERE id = $1', [req.userId])).rows[0]
-    const limit = planLimits(effectivePlan(userRow)).scriptsPerMonth
-    if (Number.isFinite(limit)) {
+    scriptLimit = planLimits(effectivePlan(userRow)).scriptsPerMonth
+    if (Number.isFinite(scriptLimit)) {
       const usedRow = (await db.query(
         `SELECT COUNT(*) AS c FROM scripts WHERE user_id = $1 AND created_at >= date_trunc('month', NOW())`,
         [req.userId]
       )).rows[0]
-      if (parseInt(usedRow?.c || 0) >= limit) {
+      if (parseInt(usedRow?.c || 0) >= scriptLimit) {
         return res.status(402).json({
           success: false,
           error: {
             code: 'LIMIT_REACHED',
-            message: `You've used all ${limit} scripts this month on the free plan. Upgrade to Pro for unlimited scripts.`,
+            message: `You've used all ${scriptLimit} scripts this month on the free plan. Upgrade to Pro for unlimited scripts.`,
           },
         })
       }
@@ -82,17 +95,26 @@ router.post(
 
     // Fetch creator context (RAG + voice profile) in parallel with step 2 delay
     const userId = req.userId
-    const creatorContext = await buildCreatorContext(userId, topicTitle, niche).catch(() => null)
+    const creatorContext = await withTimeout(
+      buildCreatorContext(userId, topicTitle, niche).catch(() => null),
+      TIMEOUTS.creatorContextMs, null
+    )
 
     await sleep(300)
     sendSSE(res, 'progress', { step: 2, status: 'done', label: 'Analysis complete' })
 
     const onProgress = ({ step, status, label }) => sendSSE(res, 'progress', { step, status, label })
 
-    const { script, contentKit } = await runScriptPipeline(
-      topicId || crypto.randomUUID(),
-      topicTitle, tone, format, niche, onProgress, creatorContext
+    const pipelineResult = await withTimeout(
+      runScriptPipeline(
+        topicId || crypto.randomUUID(),
+        topicTitle, tone, format, niche, onProgress, creatorContext
+      ),
+      TIMEOUTS.scriptPipelineMs, null
     )
+
+    if (!pipelineResult) throw new Error('Script generation timed out. Please try again.')
+    const { script, contentKit } = pipelineResult
 
     const scriptId = crypto.randomUUID()
     const fullScript = { ...script, id: scriptId, createdAt: new Date().toISOString() }
@@ -100,13 +122,24 @@ router.post(
 
     try {
       const db = await getDb()
-      await db.query(
+      // Conditional INSERT — re-checks the quota at persist time so concurrent
+      // requests that all passed the early count check can't collectively exceed it.
+      const sqlLimit = Number.isFinite(scriptLimit) ? scriptLimit : Number.MAX_SAFE_INTEGER
+      const insertRes = await db.query(
         `INSERT INTO scripts (id, topic_id, topic_title, tone, format, hook_line, scenes, cta, niche, platform, user_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+         SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+         WHERE (SELECT COUNT(*) FROM scripts WHERE user_id = $11 AND created_at >= date_trunc('month', NOW())) < $12
+         RETURNING id`,
         [scriptId, fullScript.topicId || topicId, fullScript.topicTitle, fullScript.tone,
          fullScript.format, fullScript.hookLine, JSON.stringify(fullScript.scenes),
-         fullScript.cta, fullScript.niche, fullScript.platform || 'instagram', userId]
+         fullScript.cta, fullScript.niche, fullScript.platform || 'instagram', userId, sqlLimit]
       )
+
+      if (insertRes.rows.length === 0) {
+        sendSSE(res, 'error', { message: `You've used all ${scriptLimit} scripts this month on the free plan. Upgrade to Pro for unlimited scripts.` })
+        return res.end()
+      }
+
       await db.query(
         `INSERT INTO content_kits (id, script_id, hook_variants, caption, hashtags, thumbnail_text)
          VALUES ($1, $2, $3, $4, $5, $6)`,

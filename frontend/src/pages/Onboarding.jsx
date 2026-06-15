@@ -209,6 +209,7 @@ function VoiceStep({ onNext, onSkip }) {
   const timerRef = useRef(null)
   const streamRef = useRef(null)
   const mimeRef = useRef('audio/webm')
+  const voiceProfileRef = useRef(null)  // structured prosody profile from transcribe
 
   const MAX_SECONDS = 90
   const hasMicSupport = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
@@ -266,6 +267,7 @@ function VoiceStep({ onNext, onSkip }) {
       try {
         const result = await transcribeVoice(base64, mimeRef.current.split(';')[0])
         setV(result.transcript || '')
+        voiceProfileRef.current = result.voiceProfile || null
         setMode('text')
         setRecState('idle')
         if (!result.transcript) setErrorMsg('No speech detected — paste your script instead.')
@@ -372,7 +374,7 @@ function VoiceStep({ onNext, onSkip }) {
         <button
           className="btn btn-primary"
           disabled={!v.trim() || recState === 'recording' || recState === 'processing'}
-          onClick={() => onNext(`Trained on your sample (${v.trim().length} chars)`)}>
+          onClick={() => onNext(v.trim(), voiceProfileRef.current)}>
           Train my voice →
         </button>
       </div>
@@ -498,6 +500,9 @@ export default function Onboarding() {
   const [step, setStep] = useState(0)
   const [phase, setPhase] = useState('asking') // 'asking' | 'processing' | 'welcome'
   const [answers, setAnswers] = useState({})
+  // Real voice sample text + structured prosody profile (kept out of `answers`,
+  // which only holds short display sentinels). Read at launch time.
+  const voiceRef = useRef({ sample: '', profile: null })
 
   const STEPS = [
     { key: 'name' },
@@ -542,7 +547,8 @@ export default function Onboarding() {
           languageStyle: answers.language || 'English',
           audiencePersona: answers.audience === '(ai-infer)' ? '' : (answers.audience || ''),
           primaryGoal: answers.goal || 'Grow audience',
-          rawVoiceSample: answers.voice !== '(skipped)' ? answers.voice || '' : '',
+          rawVoiceSample: voiceRef.current.sample || '',
+          audioVoiceProfile: voiceRef.current.profile || null,
         })
       ])
     } catch {
@@ -602,8 +608,8 @@ export default function Onboarding() {
     )
     if (k === 'voice') return (
       <VoiceStep
-        onNext={v => submit('voice', v)}
-        onSkip={() => submit('voice', '(skipped)')}
+        onNext={(sample, profile) => { voiceRef.current = { sample: sample || '', profile: profile || null }; submit('voice', sample ? 'provided' : '(skipped)') }}
+        onSkip={() => { voiceRef.current = { sample: '', profile: null }; submit('voice', '(skipped)') }}
       />
     )
   }

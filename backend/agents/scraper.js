@@ -6,6 +6,42 @@ import {
 } from '../constants.js'
 import { logger } from '../lib/logger.js'
 
+// YouTube's short-window burst limit (rateLimitExceeded) trips when the cron warms
+// niches back-to-back. It's transient (unlike the daily quotaExceeded), so a short
+// backoff retry clears it. Daily-quota errors are NOT retried — that would be futile.
+const YT_RETRY = { max: 2, baseDelayMs: 2000 }
+const YT_MIN_GAP_MS = 1100 // min spacing between any two YT search calls (anti-burst)
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+// Global throttle: chain every YT search through a single promise so calls are
+// spaced ≥ YT_MIN_GAP_MS apart even when tiers/warms run concurrently. This is
+// what actually prevents the rateLimitExceeded bursts; retry is the safety net.
+let ytGate = Promise.resolve()
+function ytThrottle() {
+  const wait = ytGate.then(() => sleep(YT_MIN_GAP_MS))
+  ytGate = wait
+  return wait
+}
+
+async function fetchYouTubeSearch(url, niche) {
+  await ytThrottle()
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) })
+    if (res.ok) return res
+
+    let reason = ''
+    try { const e = await res.clone().json(); reason = e.error?.errors?.[0]?.reason || e.error?.status || '' } catch {}
+
+    const transient = res.status === 429 && reason !== 'quotaExceeded'
+    if (transient && attempt < YT_RETRY.max) {
+      await sleep(YT_RETRY.baseDelayMs * (attempt + 1))
+      continue
+    }
+    logger.warn('scraper.youtube_http_error', { niche, status: res.status, reason })
+    return null
+  }
+}
+
 // ── Main scraper ──────────────────────────────────────────────────────────────
 
 export async function scrapeTrends(niches, platforms, userCtx = {}) {
@@ -47,13 +83,8 @@ async function scrapeYouTube(niches, platforms, results, userCtx = {}) {
       // maxResults=5 (search.list is priced per call) — so we pull a 50-item pool
       // for free. The cron caches this pool; users sample from it (no per-user calls).
       const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(cat.query)}&type=video&order=viewCount&publishedAfter=${sevenDaysAgo}&maxResults=50&relevanceLanguage=en&key=${key}`
-      const res = await fetch(searchUrl, { signal: AbortSignal.timeout(10000) })
-      if (!res.ok) {
-        let reason = ''
-        try { const e = await res.json(); reason = e.error?.errors?.[0]?.reason || e.error?.status || '' } catch {}
-        logger.warn('scraper.youtube_http_error', { niche, status: res.status, reason })
-        return
-      }
+      const res = await fetchYouTubeSearch(searchUrl, niche)
+      if (!res) return // error already logged (after retries for transient 429s)
 
       const data = await res.json()
       if (!data.items?.length) return

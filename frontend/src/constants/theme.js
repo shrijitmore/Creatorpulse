@@ -67,3 +67,9 @@ export const ANIMATION = {
   normal: '0.2s ease',
   slow:   '0.35s cubic-bezier(.16,1,.3,1)',
 }
+
+// Brand logo heights (px) — keep the wordmark legible across surfaces.
+export const LOGO_HEIGHTS = {
+  nav:  96,   // app sidebar / marketing navbar
+  auth: 112,  // sign-in / sign-up pages
+}

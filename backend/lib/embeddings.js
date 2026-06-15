@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import { getDb } from '../db.js'
+import { TIMEOUTS } from '../constants.js'
 
 const EMBEDDING_MODEL = 'text-embedding-004'
 const EMBEDDING_DIM = 768
@@ -203,7 +204,16 @@ async function getAccessToken(credentials) {
     credentials,
     scopes: ['https://www.googleapis.com/auth/cloud-platform']
   })
-  const client = await auth.getClient()
-  const token = await client.getAccessToken()
-  return token.token
+
+  const fetchToken = (async () => {
+    const client = await auth.getClient()
+    const token = await client.getAccessToken()
+    return token.token
+  })()
+
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Vertex AI auth timed out')), TIMEOUTS.embeddingAuthMs)
+  )
+
+  return Promise.race([fetchToken, timeout])
 }

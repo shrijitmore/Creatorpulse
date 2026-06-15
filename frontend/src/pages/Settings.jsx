@@ -2,8 +2,9 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { NICHES } from '../constants/niches.js'
 import { COLORS } from '../constants/theme.js'
+import { PLANS } from '../constants/plans.js'
 import { CONTENT_FORMATS, LANGUAGE_STYLES } from '../constants/platforms.js'
-import { updateNiches, refreshTrends, getProfile, updateProfile } from '../lib/api.js'
+import { updateNiches, refreshTrends, getProfile, updateProfile, getMe } from '../lib/api.js'
 
 const SECTIONS = [
   { id: 'account',       label: 'Account' },
@@ -11,7 +12,6 @@ const SECTIONS = [
   { id: 'creation',      label: 'Creation' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'plan',          label: 'Plan' },
-  { id: 'integrations',  label: 'Integrations' },
 ]
 
 
@@ -46,6 +46,8 @@ export default function Settings() {
   const [nicheSaving, setNicheSaving] = useState(false)
   const [nicheSaved, setNicheSaved] = useState(false)
   const [nicheError, setNicheError] = useState('')
+  const [plan, setPlan] = useState('free')
+  const nicheLimit = PLANS.find(p => p.id === plan)?.limits.niches ?? PLANS[0].limits.niches
 
   const [langStyle, setLangStyle] = useState(['english'])
   const [contentFormat, setContentFormat] = useState('on-camera')
@@ -61,6 +63,10 @@ export default function Settings() {
   const storedProfile = useMemo(() => { try { return JSON.parse(localStorage.getItem('trendforge_profile') || '{}') } catch { return {} } }, [])
   const name = storedProfile.name || 'Creator'
   const initials = name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+
+  useEffect(() => {
+    getMe().then(u => { if (u?.plan) setPlan(u.plan) }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     getProfile().then(d => {
@@ -101,7 +107,17 @@ export default function Settings() {
     localStorage.setItem('cp_notifs', JSON.stringify(current))
   }, [notifDailyDigest, notifNewTrend, notifCoaching])
 
-  const toggleNiche = id => { setSelectedNiches(prev => prev.includes(id) ? prev.filter(n => n !== id) : [...prev, id]); setNicheSaved(false) }
+  const toggleNiche = id => {
+    setSelectedNiches(prev => {
+      if (prev.includes(id)) return prev.filter(n => n !== id)
+      if (prev.length >= nicheLimit) {
+        setNicheError(`${plan === 'free' ? 'Free' : 'Your'} plan is limited to ${nicheLimit} niches. Upgrade to Pro for unlimited niches.`)
+        return prev
+      }
+      return [...prev, id]
+    })
+    setNicheSaved(false)
+  }
 
   const saveNiches = async () => {
     if (!selectedNiches.length) { setNicheError('Select at least one niche.'); return }
@@ -110,7 +126,7 @@ export default function Settings() {
       await updateNiches(selectedNiches)
       refreshTrends(selectedNiches, []).catch(() => {})
       setNicheSaved(true); setTimeout(() => setNicheSaved(false), 2500)
-    } catch { setNicheError('Failed to save.') }
+    } catch (err) { setNicheError(err.message || 'Failed to save.') }
     finally { setNicheSaving(false) }
   }
 
@@ -125,7 +141,7 @@ const scrollTo = (id) => {
         <div>
           <span className="kicker">Preferences</span>
           <h1 style={{ fontSize: 24, fontWeight: 500, letterSpacing: '-0.02em', color: 'var(--ink)', marginTop: 6 }}>Settings</h1>
-          <p className="body" style={{ marginTop: 4 }}>Niches, account, integrations. The dials behind the curtain.</p>
+          <p className="body" style={{ marginTop: 4 }}>Niches, account, plan. The dials behind the curtain.</p>
         </div>
       </div>
 
@@ -195,7 +211,9 @@ const scrollTo = (id) => {
             </div>
             {nicheError && <p style={{ fontSize: 12, color: COLORS.error, marginTop: 10 }}>{nicheError}</p>}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--line)' }}>
-              <span className="small">{selectedNiches.length} niche{selectedNiches.length !== 1 ? 's' : ''} selected</span>
+              <span className="small">
+                {selectedNiches.length}{Number.isFinite(nicheLimit) ? `/${nicheLimit}` : ''} niche{selectedNiches.length !== 1 ? 's' : ''} selected
+              </span>
               <button
                 className="btn btn-primary btn-sm"
                 disabled={nicheSaving}
@@ -321,52 +339,9 @@ const scrollTo = (id) => {
             </div>
           </div>
 
-          {/* Integrations / API Keys */}
-          <div className="set-block" ref={el => sectionRefs.current['integrations'] = el} id="integrations">
-            <span className="kicker">Integrations</span>
-            <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)', marginTop: 4, marginBottom: 4 }}>API Keys</h2>
-            <p className="body">Keys are configured server-side in <span style={{ fontFamily: 'var(--mono)', fontSize: 12, background: 'var(--paper-2)', padding: '1px 6px', borderRadius: 4, border: '1px solid var(--line)' }}>backend/.env</span> and are never stored in the browser. Secrets never leave your server.</p>
-
-            <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--paper-2)', border: '1px solid var(--line)', borderRadius: 10, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-              <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>ⓘ</span>
-              <p className="small">Edit <span style={{ fontFamily: 'var(--mono)', fontSize: 11, background: 'var(--paper-3)', padding: '1px 5px', borderRadius: 3 }}>backend/.env</span> on the server and restart the backend to apply changes. Use a secret manager (e.g. Google Secret Manager, Doppler) in production.</p>
-            </div>
-
-            <div style={{ marginTop: 24 }}>
-              {[
-                { section: 'AI Generation (Vertex AI)', keys: [
-                  { name: 'GOOGLE_CLOUD_PROJECT',       desc: 'GCP project ID' },
-                  { name: 'GOOGLE_SERVICE_ACCOUNT_JSON', desc: 'Service account JSON (Vertex AI permissions)' },
-                  { name: 'GEMINI_MODEL',                desc: 'Model name, e.g. gemini-2.5-flash' },
-                ]},
-                { section: 'YouTube + Reddit', keys: [
-                  { name: 'YOUTUBE_API_KEY',     desc: 'YouTube Data API v3 key' },
-                  { name: 'REDDIT_CLIENT_ID',    desc: 'Reddit OAuth app client ID (optional)' },
-                  { name: 'REDDIT_CLIENT_SECRET', desc: 'Reddit OAuth app secret (optional)' },
-                ]},
-                { section: 'Auth + Billing', keys: [
-                  { name: 'CLERK_SECRET_KEY',      desc: 'Clerk backend secret — never expose to frontend' },
-                  { name: 'RAZORPAY_KEY_ID',       desc: 'Razorpay key ID (rzp_live_… in production)' },
-                  { name: 'RAZORPAY_KEY_SECRET',   desc: 'Razorpay webhook secret' },
-                ]},
-              ].map(group => (
-                <div key={group.section} style={{ marginBottom: 24 }}>
-                  <p style={{ fontSize: 11, fontFamily: 'var(--mono)', letterSpacing: '0.07em', color: 'var(--mute)', textTransform: 'uppercase', marginBottom: 10 }}>{group.section}</p>
-                  {group.keys.map(k => (
-                    <div key={k.name} style={{ display: 'flex', alignItems: 'baseline', gap: 12, padding: '7px 0', borderTop: '1px solid var(--line-2)', flexWrap: 'wrap' }}>
-                      <span className="set-env-key">{k.name}</span>
-                      <span style={{ fontSize: 12, color: 'var(--mute)' }}>{k.desc}</span>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* App info */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', border: '1px solid var(--line-2)', borderRadius: 12, background: 'var(--paper-2)' }}>
-            <span style={{ fontSize: 11.5, color: 'var(--mute)', fontFamily: 'var(--mono)' }}>Influensa · v1.0.0 · MVP Build</span>
-            <span style={{ fontSize: 11.5, color: 'var(--mute)', fontFamily: 'var(--mono)' }}>Gemini 2.5 Flash · Vertex AI · LangGraph</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '14px 20px', border: '1px solid var(--line-2)', borderRadius: 12, background: 'var(--paper-2)' }}>
+            <span style={{ fontSize: 11.5, color: 'var(--mute)', fontFamily: 'var(--mono)' }}>Influensa · v1.0.0</span>
           </div>
 
         </div>

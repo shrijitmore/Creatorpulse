@@ -166,12 +166,21 @@ export async function deleteScript(id) {
 }
 
 export async function updateNiches(niches) {
-  localStorage.setItem('trendforge_niches', JSON.stringify(niches))
   try {
     await apiFetch('/api/user/niches', { method: 'PATCH', body: JSON.stringify({ niches }) })
   } catch (err) {
-    console.warn('Failed to sync niches to server:', err.message)
+    const match = err.message.match(/^API \d+: (.*)/s)
+    if (match) {
+      try {
+        const parsed = JSON.parse(match[1])
+        throw new Error(parsed.error?.message || err.message)
+      } catch {
+        throw err
+      }
+    }
+    throw err
   }
+  localStorage.setItem('trendforge_niches', JSON.stringify(niches))
   return { niches }
 }
 
@@ -230,7 +239,8 @@ export async function getSimilarScripts(topic, niche) {
 export async function transcribeVoice(audioBase64, mimeType = 'audio/webm') {
   const data = await apiFetch('/api/memory/transcribe-voice', {
     method: 'POST',
-    body: JSON.stringify({ audioBase64, mimeType })
+    body: JSON.stringify({ audioBase64, mimeType }),
+    timeoutMs: 60000, // audio inference + possible model fallback can exceed 30s
   })
   return data.data || data
 }

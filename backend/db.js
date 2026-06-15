@@ -198,6 +198,9 @@ async function runMigrations(db) {
     `ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS content_format TEXT DEFAULT 'on-camera'`,
     `ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS language_style TEXT DEFAULT 'English'`,
     `ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS audience_age TEXT`,
+    // Structured voice fingerprint (rhythm, energy, fillers, catchphrases, opener/cta style)
+    // — richer than the flat voice_traits array, used to condition script generation.
+    `ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS voice_fingerprint JSONB DEFAULT '{}'`,
 
     // Scripts
     `CREATE TABLE IF NOT EXISTS scripts (

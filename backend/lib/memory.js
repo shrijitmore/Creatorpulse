@@ -54,28 +54,29 @@ export async function saveCreatorProfile(userId, profileData) {
     creatorName, platforms, contentStyles,
     contentFormat = 'on-camera', languageStyle = 'English',
     audiencePersona, audienceAge, primaryGoal, rawVoiceSample,
-    voiceTraits, nicheStrengths
+    voiceTraits, voiceFingerprint, nicheStrengths
   } = profileData
 
   await db.query(
     `INSERT INTO creator_profiles
        (id, user_id, creator_name, platforms, content_styles, content_format, language_style,
-        audience_persona, audience_age, primary_goal, raw_voice_sample, voice_traits, niche_strengths, onboarding_done, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,TRUE,NOW())
+        audience_persona, audience_age, primary_goal, raw_voice_sample, voice_traits, voice_fingerprint, niche_strengths, onboarding_done, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,TRUE,NOW())
      ON CONFLICT (user_id) DO UPDATE SET
-       creator_name    = EXCLUDED.creator_name,
-       platforms       = EXCLUDED.platforms,
-       content_styles  = EXCLUDED.content_styles,
-       content_format  = EXCLUDED.content_format,
-       language_style  = EXCLUDED.language_style,
-       audience_persona= EXCLUDED.audience_persona,
-       audience_age    = EXCLUDED.audience_age,
-       primary_goal    = EXCLUDED.primary_goal,
-       raw_voice_sample= EXCLUDED.raw_voice_sample,
-       voice_traits    = EXCLUDED.voice_traits,
-       niche_strengths = EXCLUDED.niche_strengths,
-       onboarding_done = TRUE,
-       updated_at      = NOW()`,
+       creator_name     = EXCLUDED.creator_name,
+       platforms        = EXCLUDED.platforms,
+       content_styles   = EXCLUDED.content_styles,
+       content_format   = EXCLUDED.content_format,
+       language_style   = EXCLUDED.language_style,
+       audience_persona = EXCLUDED.audience_persona,
+       audience_age     = EXCLUDED.audience_age,
+       primary_goal     = EXCLUDED.primary_goal,
+       raw_voice_sample = EXCLUDED.raw_voice_sample,
+       voice_traits     = EXCLUDED.voice_traits,
+       voice_fingerprint= EXCLUDED.voice_fingerprint,
+       niche_strengths  = EXCLUDED.niche_strengths,
+       onboarding_done  = TRUE,
+       updated_at       = NOW()`,
     [
       id, userId, creatorName,
       platforms || [],
@@ -87,6 +88,7 @@ export async function saveCreatorProfile(userId, profileData) {
       primaryGoal || '',
       rawVoiceSample || '',
       JSON.stringify(voiceTraits || []),
+      JSON.stringify(voiceFingerprint || {}),
       JSON.stringify(nicheStrengths || {})
     ]
   )
@@ -143,8 +145,14 @@ Audience: ${profile.audience_persona || 'general audience'}
 Primary goal: ${profile.primary_goal || 'grow audience'}
 Voice traits: ${formatVoiceTraits(profile.voice_traits)}`)
 
+  const fpBlock = formatVoiceFingerprint(profile.voice_fingerprint)
+  if (fpBlock) {
+    parts.push(`\nVOICE FINGERPRINT (write to match these — this is HOW the creator sounds):
+${fpBlock}`)
+  }
+
   if (profile.raw_voice_sample) {
-    parts.push(`\nCREATOR'S VOICE SAMPLE (match this tone/style):
+    parts.push(`\nCREATOR'S VOICE SAMPLE (mirror this exact rhythm, word choice, and energy):
 "${profile.raw_voice_sample.slice(0, 500)}"`)
   }
 
@@ -172,4 +180,35 @@ function formatVoiceTraits(traits) {
   if (!traits) return 'not specified'
   const arr = typeof traits === 'string' ? JSON.parse(traits) : traits
   return Array.isArray(arr) ? arr.join(', ') : 'not specified'
+}
+
+// Render the structured fingerprint as labelled lines for the generation prompt.
+// Returns '' when there's nothing meaningful to add (keeps the prompt lean).
+function formatVoiceFingerprint(fp) {
+  if (!fp) return ''
+  const obj = typeof fp === 'string' ? safeParse(fp) : fp
+  if (!obj || typeof obj !== 'object') return ''
+
+  const fmt = v => Array.isArray(v) ? v.filter(Boolean).join(', ') : String(v || '').trim()
+  const line = (label, v) => { const s = fmt(v); return s ? `- ${label}: ${s}` : null }
+
+  const lines = [
+    line('Energy', obj.energyLevel),
+    line('Pacing', obj.pacing),
+    line('Formality', obj.formality),
+    line('Sentence rhythm', obj.sentenceRhythm),
+    line('Vocabulary', obj.vocabulary),
+    line('Filler words to sprinkle in (keep it human)', obj.fillerWords),
+    line('Signature catchphrases (reuse where natural)', obj.catchphrases),
+    line('How they open', obj.openerStyle),
+    line('How they close / CTA', obj.ctaStyle),
+    line('Tonal qualities', obj.tonalQualities),
+    line('Quirks', obj.quirks),
+  ].filter(Boolean)
+
+  return lines.join('\n')
+}
+
+function safeParse(s) {
+  try { return JSON.parse(s) } catch { return null }
 }

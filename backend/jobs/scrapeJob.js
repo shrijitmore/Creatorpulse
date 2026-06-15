@@ -69,6 +69,15 @@ export async function runScrapeTier(tier, redis) {
   logger.info('scrapeJob.tier_start', { tier, niches: niches.length })
   let total = 0
   for (const niche of niches) {
+    // Skip niches whose pool is still fresh in Redis. The TTL expiring (key gone)
+    // is what triggers a re-scrape — so a server restart/redeploy doesn't re-burn
+    // external API quota on pools that are already warm.
+    try {
+      if (redis && await redis.exists(nichePoolKey(niche))) {
+        logger.info('scrapeJob.niche_fresh_skip', { niche })
+        continue
+      }
+    } catch {}
     const trends = await warmNiche(niche, redis)
     total += trends.length
   }

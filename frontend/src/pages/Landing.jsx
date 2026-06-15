@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/clerk-react'
 import { Icon } from '../components/ui.jsx'
 import BrandLogo from '../components/BrandLogo.jsx'
+import { LOGO_HEIGHTS } from '../constants/theme.js'
 import Seo from '../components/Seo.jsx'
 
 function useCountUp(target, duration = 1800) {
@@ -177,7 +178,7 @@ export default function Landing() {
       <nav className="ln-nav">
         <div className="wrap">
           <div className="row between" style={{ height: 64 }}>
-            <BrandLogo height={26} />
+            <BrandLogo height={LOGO_HEIGHTS.nav} />
             <nav className="ln-links">
               <a href="#features">Features</a>
               <a href="#process">How it works</a>
@@ -499,7 +500,7 @@ export default function Landing() {
       <footer className="ln-foot">
         <div className="wrap">
           <div className="row between">
-            <BrandLogo height={26} />
+            <BrandLogo height={LOGO_HEIGHTS.nav} />
             <div className="row" style={{ gap: 24, fontSize: 13, color: 'var(--mute)' }}>
               <span>© 2026 Influensa</span>
               <span>Gemini 2.5 Flash · Vertex AI</span>

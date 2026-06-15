@@ -14,7 +14,7 @@ export const NICHES_DEFAULT = ['fitness', 'finance', 'tech', 'lifestyle', 'food'
 // Billing — amounts in paise (INR × 100) for Razorpay
 export const PLAN_AMOUNTS = {
   pro:    { monthly: 99900,   yearly: 958800  },
-  agency: { monthly: 499900,  yearly: 4799040 },
+  agency: { monthly: 499900,  yearly: 4799000 },
 }
 
 export const COUPON_DISCOUNTS = {
@@ -33,6 +33,33 @@ export const PLAN_LIMITS = {
 // How many billing cycles a subscription runs before completing.
 // Razorpay requires total_count; set high so it effectively auto-renews.
 export const SUBSCRIPTION_TOTAL_COUNT = { monthly: 120, yearly: 10 }
+
+// Hard ceilings so a hung upstream call (Gemini, Vertex auth, etc.) degrades to
+// an error instead of leaving an SSE stream open forever.
+export const TIMEOUTS = {
+  embeddingAuthMs:  10000,
+  creatorContextMs: 8000,
+  scriptPipelineMs: 90000,
+}
+
+// Retry policy for transient Vertex AI errors (429 RESOURCE_EXHAUSTED, 503).
+export const GEMINI_RETRY = {
+  maxRetries:   2,
+  baseDelayMs:  1000,
+}
+
+// Model fallback chain. Each model has its own per-project-per-minute quota
+// bucket on Vertex, so falling through to the next on a 429 multiplies the
+// effective request capacity. Ordered best → cheapest/fastest. Override the
+// primary with GEMINI_MODEL env; the rest stay as backups.
+// Only models verified accessible in the active Vertex project (sanskruti-407310,
+// us-central1). 2.0/1.5 ids return NO-ACCESS there, so they're excluded.
+// Order: primary → cheap+fast backup → most-capable last resort.
+export const GEMINI_FALLBACK_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-pro',
+]
 
 export const SIGNAL_THRESHOLDS = { viral: 80, rising: 55 }
 

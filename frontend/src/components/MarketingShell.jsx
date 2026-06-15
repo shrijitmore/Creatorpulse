@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import BrandLogo from './BrandLogo.jsx'
+import { LOGO_HEIGHTS } from '../constants/theme.js'
 
 const FOOTER_GROUPS = [
   { title: 'Product', links: [
@@ -38,7 +39,7 @@ export default function MarketingShell({ children }) {
       <nav className="ln-nav">
         <div className="wrap">
           <div className="row between" style={{ height: 64 }}>
-            <BrandLogo height={26} />
+            <BrandLogo height={LOGO_HEIGHTS.nav} />
             <nav className="ln-links">
               <Link to="/pricing">Pricing</Link>
               <Link to="/blog">Blog</Link>

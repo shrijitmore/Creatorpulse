@@ -1,4 +1,12 @@
 import { ChatVertexAI } from '@langchain/google-vertexai'
+import { GEMINI_RETRY, GEMINI_FALLBACK_MODELS } from '../constants.js'
+
+// True when a Vertex error is a transient quota/overload — i.e. worth retrying
+// on a different model. Matches 429 RESOURCE_EXHAUSTED and 503 UNAVAILABLE.
+function isQuotaError(err) {
+  const msg = String(err?.message || err || '')
+  return /429|resource.?exhausted|too many requests|quota|503|unavailable|overloaded/i.test(msg)
+}
 
 // ── Creator profile cache ─────────────────────────────────────────────────────
 // Cache profile system prompts in memory (per userId) to reduce token cost.
@@ -42,11 +50,20 @@ export function hasGeminiCredentials() {
   return !!(process.env.GOOGLE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_AI_API_KEY)
 }
 
-export function createGeminiModel({ temperature = 0.7, maxOutputTokens = 3000 } = {}) {
+// Build the ordered list of models to try. The env override (if set) goes
+// first, then the static fallback chain with the primary de-duplicated out.
+function resolveModelChain() {
+  const primary = process.env.GEMINI_MODEL
+  const chain = primary
+    ? [primary, ...GEMINI_FALLBACK_MODELS.filter(m => m !== primary)]
+    : [...GEMINI_FALLBACK_MODELS]
+  return chain
+}
+
+function buildVertexModel(modelId, { temperature, maxOutputTokens }) {
   const credentials = parseCredentials()
   const project = process.env.GOOGLE_CLOUD_PROJECT || credentials?.project_id
   const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1'
-  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
 
   // Reduce safety thresholds so creative/controversial content isn't blocked.
   // BLOCK_ONLY_HIGH still catches genuinely dangerous output.
@@ -57,23 +74,49 @@ export function createGeminiModel({ temperature = 0.7, maxOutputTokens = 3000 } 
     { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
   ]
 
-  const config = {
-    model,
-    temperature,
-    maxOutputTokens,
-    location,
-    project,
-    safetySettings,
-  }
-
+  // maxRetries:0 — let OUR fallback wrapper handle quota errors immediately.
+  // LangChain's default (6 retries w/ exponential backoff) would burn ~30-60s
+  // hammering the already-exhausted model before the error reaches our chain.
+  const config = { model: modelId, temperature, maxOutputTokens, location, project, safetySettings, maxRetries: 0 }
   if (credentials) {
-    config.authOptions = {
-      credentials,
-      projectId: project,
-    }
+    config.authOptions = { credentials, projectId: project }
   }
-
   return new ChatVertexAI(config)
+}
+
+/**
+ * Returns a model-like object exposing .invoke(prompt). Internally it tries each
+ * model in the fallback chain in order; on a quota/overload error (429/503) it
+ * moves to the next model — each has its own Vertex quota bucket, so this
+ * multiplies effective capacity. Non-quota errors throw immediately.
+ *
+ * Drop-in for the old createGeminiModel return value (call sites use .invoke only).
+ */
+export function createGeminiModel({ temperature = 0.7, maxOutputTokens = 3000 } = {}) {
+  const chain = resolveModelChain()
+
+  return {
+    async invoke(prompt) {
+      let lastErr
+      for (let i = 0; i < chain.length; i++) {
+        const modelId = chain[i]
+        try {
+          const model = buildVertexModel(modelId, { temperature, maxOutputTokens })
+          const res = await model.invoke(prompt)
+          if (i > 0) console.warn(`[gemini] Served via fallback model "${modelId}" (primary exhausted)`)
+          return res
+        } catch (err) {
+          lastErr = err
+          if (isQuotaError(err) && i < chain.length - 1) {
+            console.warn(`[gemini] "${modelId}" quota/overload — falling back to "${chain[i + 1]}"`)
+            continue
+          }
+          throw err
+        }
+      }
+      throw lastErr
+    },
+  }
 }
 
 /**
@@ -105,7 +148,7 @@ export async function transcribeAudio(audioBase64, mimeType = 'audio/webm') {
   const credentials = parseCredentials()
   const project = process.env.GOOGLE_CLOUD_PROJECT || credentials?.project_id
   const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1'
-  const modelId = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+  const chain = resolveModelChain()
 
   if (!project) throw new Error('No GOOGLE_CLOUD_PROJECT configured')
   if (!credentials) throw new Error('Service account credentials required for audio transcription')
@@ -118,24 +161,34 @@ export async function transcribeAudio(audioBase64, mimeType = 'audio/webm') {
   })
   const { token: accessToken } = await client.getAccessToken()
 
-  const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${modelId}:generateContent`
-
   const body = {
     contents: [{
       role: 'user',
       parts: [
         {
-          text: `Listen to this voice recording.
-1. Transcribe it word-for-word.
-2. Identify 3-5 communication style traits from HOW the person speaks (not what they say).
+          text: `You are a voice/speech analyst. Listen to this voice recording carefully — the AUDIO carries signal that text cannot (energy, pace, emphasis, pauses, vocal warmth).
+
+1. Transcribe it word-for-word (include natural filler words like "um", "like", "you know" — do NOT clean them up; they are part of the voice).
+2. Build a structured VOICE FINGERPRINT describing HOW this person speaks, not what they say. Base it on the actual audio.
 
 Return ONLY valid JSON:
 {
-  "transcript": "exact words spoken",
-  "traits": ["trait1", "trait2", "trait3"]
+  "transcript": "exact words spoken, fillers included",
+  "traits": ["5-7 short descriptive traits"],
+  "voiceProfile": {
+    "energyLevel": "high | medium | low",
+    "pacing": "fast | moderate | deliberate",
+    "formality": "casual | semi-formal | formal",
+    "sentenceRhythm": "e.g. short punchy fragments | long flowing sentences | mixed",
+    "fillerWords": ["actual fillers/verbal tics heard, e.g. like, honestly, right"],
+    "catchphrases": ["any signature/repeated phrases, [] if none"],
+    "openerStyle": "how they tend to open — bold claim, question, story, greeting",
+    "tonalQualities": ["e.g. warm, urgent, deadpan, animated, reassuring"],
+    "quirks": "distinctive habits — code-switching, rhetorical questions, self-deprecation, emphasis patterns"
+  }
 }
 
-Trait examples: "conversational", "high energy", "direct and punchy", "uses rhetorical questions", "storytelling style", "casual", "motivational", "vulnerable", "humorous", "uses pause for emphasis"`
+traits examples: "conversational", "high energy", "direct and punchy", "uses rhetorical questions", "storytelling", "casual", "motivational", "vulnerable", "humorous", "pauses for emphasis", "code-switches languages"`
         },
         { inlineData: { mimeType: mimeType.split(';')[0], data: audioBase64 } }
       ]
@@ -143,25 +196,57 @@ Trait examples: "conversational", "high energy", "direct and punchy", "uses rhet
     generationConfig: { temperature: 0.1, maxOutputTokens: 1000 }
   }
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  })
+  // Try each model in the chain. A 429/503 burns the current model's quota, so
+  // move to the next model (own quota bucket) rather than just sleeping. Within
+  // a single model we still do a short backoff retry for brief spikes.
+  let lastErrText = ''
+  for (let m = 0; m < chain.length; m++) {
+    const modelId = chain[m]
+    const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${modelId}:generateContent`
 
-  if (!response.ok) {
-    const errText = await response.text()
-    throw new Error(`Vertex AI audio: ${response.status} — ${errText.slice(0, 300)}`)
-  }
+    let response
+    let quotaHit = false
+    for (let attempt = 0; ; attempt++) {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
 
-  const data = await response.json()
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-  if (!text) throw new Error('Empty audio response from Vertex AI')
+      if (response.ok) break
 
-  const parsed = extractJson(text)
-  return {
-    transcript: parsed.transcript || '',
-    traits: Array.isArray(parsed.traits) ? parsed.traits : []
+      const isQuota = response.status === 429 || response.status === 503
+      // 429 = sustained quota exhaustion → don't waste time retrying the same
+      // model; fall straight to the next in the chain. 503 = transient overload
+      // → a short backoff retry on the same model is worth it.
+      if (response.status === 503 && attempt < GEMINI_RETRY.maxRetries) {
+        await new Promise(r => setTimeout(r, GEMINI_RETRY.baseDelayMs * (attempt + 1)))
+        continue
+      }
+      lastErrText = (await response.text()).slice(0, 300)
+      if (isQuota) { quotaHit = true; break }
+      throw new Error(`Vertex AI audio: ${response.status} — ${lastErrText}`)
+    }
+
+    if (quotaHit) {
+      if (m < chain.length - 1) {
+        console.warn(`[gemini] transcribe "${modelId}" quota — falling back to "${chain[m + 1]}"`)
+        continue
+      }
+      throw new Error(`Vertex AI audio: 429 — all models exhausted: ${lastErrText}`)
+    }
+
+    if (m > 0) console.warn(`[gemini] transcribe served via fallback "${modelId}"`)
+    const data = await response.json()
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    if (!text) throw new Error('Empty audio response from Vertex AI')
+
+    const parsed = extractJson(text)
+    return {
+      transcript: parsed.transcript || '',
+      traits: Array.isArray(parsed.traits) ? parsed.traits : [],
+      voiceProfile: parsed.voiceProfile && typeof parsed.voiceProfile === 'object' ? parsed.voiceProfile : null,
+    }
   }
 }
 

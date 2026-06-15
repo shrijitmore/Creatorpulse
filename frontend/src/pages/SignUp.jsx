@@ -2,6 +2,7 @@ import React from 'react'
 import { SignUp } from '@clerk/clerk-react'
 import BrandLogo from '../components/BrandLogo.jsx'
 import Seo from '../components/Seo.jsx'
+import { LOGO_HEIGHTS } from '../constants/theme.js'
 
 export default function SignUpPage() {
   return (
@@ -12,7 +13,7 @@ export default function SignUpPage() {
         <div className="auth-main" style={{ order: 1 }}>
           <div style={{ width: '100%', maxWidth: 500, overflow: 'visible' }}>
             <div style={{ marginBottom: 32 }}>
-              <BrandLogo height={26} style={{ marginBottom: 32, display: 'inline-flex' }} />
+              <BrandLogo height={LOGO_HEIGHTS.auth} style={{ marginBottom: 32, display: 'inline-flex' }} />
               <span className="kicker" style={{ display: 'block', marginTop: 24 }}>Get started free</span>
               <h1 style={{ fontSize: 28, fontWeight: 500, letterSpacing: '-0.02em', color: 'var(--ink)', marginTop: 10 }}>Create your account</h1>
             </div>

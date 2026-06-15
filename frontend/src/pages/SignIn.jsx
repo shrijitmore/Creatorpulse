@@ -2,6 +2,7 @@ import React from 'react'
 import { SignIn } from '@clerk/clerk-react'
 import BrandLogo from '../components/BrandLogo.jsx'
 import Seo from '../components/Seo.jsx'
+import { LOGO_HEIGHTS } from '../constants/theme.js'
 
 export default function SignInPage() {
   return (
@@ -10,7 +11,7 @@ export default function SignInPage() {
       <div className="auth-grid">
         {/* Left rail */}
         <div className="auth-side">
-          <BrandLogo variant="light" height={26} />
+          <BrandLogo variant="light" height={LOGO_HEIGHTS.auth} />
           <div className="auth-quote">
             <p>"The difference between creators who grow and creators who plateau is knowing what to make before they make it."</p>
             <div className="row" style={{ gap: 12, marginTop: 28 }}>

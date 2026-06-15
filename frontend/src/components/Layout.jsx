@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Outlet } from 'react-router-dom'
 import { UserButton, useClerk } from '@clerk/clerk-react'
 import { useAuth, CLERK_ENABLED } from '../lib/auth.jsx'
 import { TrendsProvider } from '../context/TrendsContext.jsx'
-import { COLORS } from '../constants/theme.js'
+import { COLORS, LOGO_HEIGHTS } from '../constants/theme.js'
 import { useRecentScripts } from '../hooks/useRecentScripts.js'
 import { useMe } from '../hooks/useMe.js'
 import BrandLogo from './BrandLogo.jsx'
@@ -170,7 +170,7 @@ function Sidebar({ onCommand, open, onClose, sideRef }) {
       aria-label="Main navigation"
       className={`side ${open ? 'mob-open' : ''}`}>
       {/* Brand */}
-      <BrandLogo height={24} />
+      <BrandLogo height={LOGO_HEIGHTS.nav} />
 
       {/* Navigation */}
       <nav className="side-nav">

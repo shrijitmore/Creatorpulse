@@ -5,6 +5,7 @@ import { ToastProvider } from './components/ui.jsx'
 import { setTokenGetter } from './lib/apiClient.js'
 import { getOnboardingStatus } from './lib/api.js'
 import BrandLogo from './components/BrandLogo.jsx'
+import { LOGO_HEIGHTS } from './constants/theme.js'
 import Seo from './components/Seo.jsx'
 import Landing from './pages/Landing.jsx'
 import SignInPage from './pages/SignIn.jsx'
@@ -39,7 +40,7 @@ const GlossaryTerm = lazy(() => import('./pages/GlossaryTerm.jsx'))
 function CheckingScreen() {
   return (
     <div className="loading-screen">
-      <BrandLogo height={24} />
+      <BrandLogo height={LOGO_HEIGHTS.nav} />
       <div style={{ display:'flex', gap:4, marginTop:8 }}>
         <span className="tdot"/><span className="tdot"/><span className="tdot"/>
       </div>
@@ -52,7 +53,7 @@ function NotFound() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, background: 'var(--paper)' }}>
       <Seo title="404 · Page not found · Influensa" path="/404" noindex />
-      <BrandLogo height={24} />
+      <BrandLogo height={LOGO_HEIGHTS.nav} />
       <p style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--mute)', marginTop: 24 }}>404 · Page not found</p>
       <h1 style={{ fontSize: 28, fontWeight: 500, letterSpacing: '-0.02em', color: 'var(--ink)', textAlign: 'center' }}>This page doesn't exist</h1>
       <p style={{ color: 'var(--ink-2)', fontSize: 14, textAlign: 'center', maxWidth: 320 }}>The link may be broken or the page may have been moved.</p>

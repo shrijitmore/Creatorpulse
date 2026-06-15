@@ -238,7 +238,7 @@ export default function Dashboard() {
 
   const nicheIds = useMemo(() => activeNiche ? [activeNiche.nicheId] : [], [activeNiche])
 
-  const { allTrends, refreshing, lastUpdated, fetchNow, refresh } = useTrends(nicheIds, { lazy: true })
+  const { allTrends, refreshing, warming, lastUpdated, fetchNow, refresh } = useTrends(nicheIds, { lazy: true })
 
   const handleNicheSelect = useCallback(async (niche) => {
     setActiveNiche(niche)
@@ -391,7 +391,16 @@ export default function Dashboard() {
         </h2>
       </div>
 
-      {allTrends.length === 0 ? (
+      {allTrends.length === 0 && warming ? (
+        <div className="card" style={{ padding: '52px 24px', textAlign: 'center' }}>
+          <p style={{ fontSize: 24, marginBottom: 12 }}>📡</p>
+          <p style={{ fontSize: 15, fontWeight: 500, color: 'var(--ink)', marginBottom: 6 }}>Scanning {nicheLabel} now…</p>
+          <p className="body" style={{ marginBottom: 20, maxWidth: 380, margin: '0 auto 20px' }}>
+            First time on this niche — pulling fresh trends from YouTube &amp; Reddit. This takes ~20–40 seconds. Results appear automatically.
+          </p>
+          <span style={{ display: 'inline-flex', gap: 4 }}><span className="tdot"/><span className="tdot"/><span className="tdot"/></span>
+        </div>
+      ) : allTrends.length === 0 ? (
         <div className="card" style={{ padding: '52px 24px', textAlign: 'center' }}>
           <p style={{ fontSize: 24, marginBottom: 12 }}>📡</p>
           <p style={{ fontSize: 15, fontWeight: 500, color: 'var(--ink)', marginBottom: 6 }}>No signals found for {nicheLabel}</p>

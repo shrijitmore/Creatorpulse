@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { getDb } from '../db.js'
 import { requireAuth } from '../lib/auth.js'
 import { isAdminRequest } from '../lib/adminAuth.js'
-import { effectivePlan } from '../lib/plan.js'
+import { effectivePlan, planLimits } from '../lib/plan.js'
 import { validate, NICHE_RE } from '../lib/validate.js'
 
 const router = Router()
@@ -55,9 +55,21 @@ router.patch('/niches', requireAuth, validate({
 }), async (req, res) => {
   try {
     const { niches } = req.body
-    const cleanNiches = niches.map(n => String(n).toLowerCase().trim()).filter(Boolean)
+    const cleanNiches = [...new Set(niches.map(n => String(n).toLowerCase().trim()).filter(Boolean))]
 
     const db = await getDb()
+    const userRow = (await db.query('SELECT plan, plan_expires_at FROM users WHERE id = $1', [req.userId])).rows[0]
+    const limit = planLimits(effectivePlan(userRow)).niches
+    if (cleanNiches.length > limit) {
+      return res.status(402).json({
+        success: false,
+        error: {
+          code: 'LIMIT_REACHED',
+          message: `Free plan is limited to ${limit} niches. Upgrade to Pro for unlimited niches.`,
+        },
+      })
+    }
+
     await db.query('UPDATE users SET niches = $1, updated_at = NOW() WHERE id = $2', [cleanNiches, req.userId])
 
     res.json({ success: true, data: { niches: cleanNiches } })
