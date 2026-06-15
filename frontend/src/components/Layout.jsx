@@ -6,6 +6,9 @@ import { TrendsProvider } from '../context/TrendsContext.jsx'
 import { COLORS } from '../constants/theme.js'
 import { useRecentScripts } from '../hooks/useRecentScripts.js'
 import { useMe } from '../hooks/useMe.js'
+import BrandLogo from './BrandLogo.jsx'
+import Seo from './Seo.jsx'
+import { getSeo } from '../lib/seo.js'
 
 const NAV = [
   { to: '/dashboard', label: 'Dashboard',      icon: '◈', shortcut: 'G D' },
@@ -167,7 +170,7 @@ function Sidebar({ onCommand, open, onClose, sideRef }) {
       aria-label="Main navigation"
       className={`side ${open ? 'mob-open' : ''}`}>
       {/* Brand */}
-      <a className="brand" href="/"><span className="mark"/>Influensa</a>
+      <BrandLogo height={24} />
 
       {/* Navigation */}
       <nav className="side-nav">
@@ -306,6 +309,7 @@ export default function Layout() {
   const [sideOpen, setSideOpen] = useState(false)
   const hamburgerRef = useRef(null)
   const sideRef = useRef(null)
+  const location = useLocation()
 
   // Scroll-lock body when mobile drawer is open
   useEffect(() => {
@@ -344,6 +348,7 @@ export default function Layout() {
 
   return (
     <TrendsProvider>
+      <Seo {...getSeo(location.pathname)} />
       <div className="app-shell">
         <Sidebar
           onCommand={() => setPaletteOpen(true)}

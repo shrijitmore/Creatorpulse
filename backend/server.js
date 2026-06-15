@@ -62,12 +62,24 @@ app.use(helmet({
       // 'unsafe-inline' required: Clerk's <ClerkProvider> injects inline scripts into the
       // served frontend HTML at runtime. Nonce-based CSP would require SSR support.
       // Mitigated by the explicit *.clerk.accounts.dev host allowlist.
-      scriptSrc: ["'self'", "'unsafe-inline'", 'https://clerk.usable-anchovy-5.clerk.accounts.dev', 'https://*.clerk.accounts.dev'],
-      connectSrc: ["'self'", 'https://*.clerk.accounts.dev', 'https://api.clerk.dev'],
-      frameSrc: ["'self'", 'https://*.clerk.accounts.dev'],
+      scriptSrc: [
+        "'self'", "'unsafe-inline'",
+        'https://clerk.usable-anchovy-5.clerk.accounts.dev', 'https://*.clerk.accounts.dev',
+        'https://checkout.razorpay.com',                 // payment checkout
+        'https://www.googletagmanager.com', 'https://www.clarity.ms', // analytics
+      ],
+      connectSrc: [
+        "'self'", 'https://*.clerk.accounts.dev', 'https://api.clerk.dev',
+        'https://api.razorpay.com', 'https://lumberjack.razorpay.com',
+        'https://www.google-analytics.com', 'https://*.google-analytics.com',
+        'https://*.clarity.ms',
+      ],
+      frameSrc: ["'self'", 'https://*.clerk.accounts.dev', 'https://api.razorpay.com', 'https://checkout.razorpay.com'],
       imgSrc: ["'self'", 'data:', 'https:'],
       // 'unsafe-inline' required for Clerk's component styles injected at runtime.
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      // fonts.googleapis.com hosts the Geist/Mono stylesheets linked from index.html.
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
     }
   },
   crossOriginEmbedderPolicy: false,

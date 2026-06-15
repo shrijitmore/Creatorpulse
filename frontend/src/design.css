@@ -698,3 +698,15 @@ button { cursor: pointer; }
 
 /* ── Studio — center on wide screens (matches app-main) ── */
 .studio { max-width: 1480px; margin: 0 auto; }
+
+/* ── Legal / long-form prose ── */
+.legal-prose { max-width: 760px; }
+.legal-prose h1 { font-size: clamp(28px, 4vw, 40px); font-weight: 600; letter-spacing: -0.025em; color: var(--ink); margin: 12px 0 0; line-height: 1.1; }
+.legal-prose .legal-updated { font-size: 13px; color: var(--mute); margin: 12px 0 32px; }
+.legal-prose h2 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); margin: 36px 0 12px; }
+.legal-prose h3 { font-size: 16px; font-weight: 600; color: var(--ink); margin: 24px 0 8px; }
+.legal-prose p { font-size: 15px; line-height: 1.7; color: var(--ink-2); margin: 0 0 14px; }
+.legal-prose ul { margin: 0 0 14px; padding-left: 22px; }
+.legal-prose li { font-size: 15px; line-height: 1.7; color: var(--ink-2); margin-bottom: 6px; }
+.legal-prose a { color: var(--ink); text-decoration: underline; }
+.legal-prose strong { color: var(--ink); font-weight: 600; }

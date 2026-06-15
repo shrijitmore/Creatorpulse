@@ -1,15 +1,18 @@
 import React from 'react'
 import { SignUp } from '@clerk/clerk-react'
+import BrandLogo from '../components/BrandLogo.jsx'
+import Seo from '../components/Seo.jsx'
 
 export default function SignUpPage() {
   return (
     <div className="auth">
+      <Seo title="Create your account · Influensa" path="/sign-up" noindex />
       <div className="auth-grid">
         {/* Left — form */}
         <div className="auth-main" style={{ order: 1 }}>
           <div style={{ width: '100%', maxWidth: 500, overflow: 'visible' }}>
             <div style={{ marginBottom: 32 }}>
-              <a className="brand" href="/" style={{ marginBottom: 32, display: 'inline-flex' }}><span className="mark"/>Influensa</a>
+              <BrandLogo height={26} style={{ marginBottom: 32, display: 'inline-flex' }} />
               <span className="kicker" style={{ display: 'block', marginTop: 24 }}>Get started free</span>
               <h1 style={{ fontSize: 28, fontWeight: 500, letterSpacing: '-0.02em', color: 'var(--ink)', marginTop: 10 }}>Create your account</h1>
             </div>

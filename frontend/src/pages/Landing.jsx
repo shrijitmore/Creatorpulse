@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '@clerk/clerk-react'
 import { Icon } from '../components/ui.jsx'
+import BrandLogo from '../components/BrandLogo.jsx'
+import Seo from '../components/Seo.jsx'
 
 function useCountUp(target, duration = 1800) {
   const [val, setVal] = useState(0)
@@ -169,12 +171,13 @@ export default function Landing() {
 
   return (
     <div className="landing">
+      <Seo path="/" />
 
       {/* ── Nav ── */}
       <nav className="ln-nav">
         <div className="wrap">
           <div className="row between" style={{ height: 64 }}>
-            <a className="brand" href="/"><span className="mark"/>Influensa</a>
+            <BrandLogo height={26} />
             <nav className="ln-links">
               <a href="#features">Features</a>
               <a href="#process">How it works</a>
@@ -496,7 +499,7 @@ export default function Landing() {
       <footer className="ln-foot">
         <div className="wrap">
           <div className="row between">
-            <a className="brand" href="/"><span className="mark"/>Influensa</a>
+            <BrandLogo height={26} />
             <div className="row" style={{ gap: 24, fontSize: 13, color: 'var(--mute)' }}>
               <span>© 2026 Influensa</span>
               <span>Gemini 2.5 Flash · Vertex AI</span>

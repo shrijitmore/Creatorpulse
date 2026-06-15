@@ -1,30 +1,45 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from './lib/auth.jsx'
-import { ToastProvider, Logomark } from './components/ui.jsx'
+import { ToastProvider } from './components/ui.jsx'
 import { setTokenGetter } from './lib/apiClient.js'
 import { getOnboardingStatus } from './lib/api.js'
-import Layout from './components/Layout.jsx'
+import BrandLogo from './components/BrandLogo.jsx'
+import Seo from './components/Seo.jsx'
 import Landing from './pages/Landing.jsx'
-import Onboarding from './pages/Onboarding.jsx'
-import Dashboard from './pages/Dashboard.jsx'
-import ScriptStudio from './pages/ScriptStudio.jsx'
-import SavedScripts from './pages/SavedScripts.jsx'
-import Settings from './pages/Settings.jsx'
-import Profile from './pages/Profile.jsx'
 import SignInPage from './pages/SignIn.jsx'
 import SignUpPage from './pages/SignUp.jsx'
-import Plans from './pages/Plans.jsx'
-import Checkout from './pages/Checkout.jsx'
-import PlanSuccess from './pages/PlanSuccess.jsx'
-import Admin from './pages/Admin.jsx'
+
+// Authed app shell + pages — lazy so the public Landing ships a lean bundle.
+const Layout       = lazy(() => import('./components/Layout.jsx'))
+const Onboarding   = lazy(() => import('./pages/Onboarding.jsx'))
+const Dashboard    = lazy(() => import('./pages/Dashboard.jsx'))
+const ScriptStudio = lazy(() => import('./pages/ScriptStudio.jsx'))
+const SavedScripts = lazy(() => import('./pages/SavedScripts.jsx'))
+const Settings     = lazy(() => import('./pages/Settings.jsx'))
+const Profile      = lazy(() => import('./pages/Profile.jsx'))
+const Plans        = lazy(() => import('./pages/Plans.jsx'))
+const Checkout     = lazy(() => import('./pages/Checkout.jsx'))
+const PlanSuccess  = lazy(() => import('./pages/PlanSuccess.jsx'))
+const Admin        = lazy(() => import('./pages/Admin.jsx'))
+
+// Public marketing + legal + content pages — lazy, indexable.
+const Pricing      = lazy(() => import('./pages/Pricing.jsx'))
+const Terms        = lazy(() => import('./pages/legal/Terms.jsx'))
+const Privacy      = lazy(() => import('./pages/legal/Privacy.jsx'))
+const Refund       = lazy(() => import('./pages/legal/Refund.jsx'))
+const Contact      = lazy(() => import('./pages/legal/Contact.jsx'))
+const Blog         = lazy(() => import('./pages/Blog.jsx'))
+const BlogPost     = lazy(() => import('./pages/BlogPost.jsx'))
+const Glossary     = lazy(() => import('./pages/Glossary.jsx'))
+const GlossaryTerm = lazy(() => import('./pages/GlossaryTerm.jsx'))
 
 // ─── Loading screen ───────────────────────────────────────────────────────────
 
 function CheckingScreen() {
   return (
     <div className="loading-screen">
-      <a className="brand" href="/"><span className="mark"></span>Influensa</a>
+      <BrandLogo height={24} />
       <div style={{ display:'flex', gap:4, marginTop:8 }}>
         <span className="tdot"/><span className="tdot"/><span className="tdot"/>
       </div>
@@ -36,7 +51,8 @@ function NotFound() {
   const navigate = useNavigate()
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, background: 'var(--paper)' }}>
-      <a className="brand" href="/"><span className="mark"></span>Influensa</a>
+      <Seo title="404 · Page not found · Influensa" path="/404" noindex />
+      <BrandLogo height={24} />
       <p style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--mute)', marginTop: 24 }}>404 · Page not found</p>
       <h1 style={{ fontSize: 28, fontWeight: 500, letterSpacing: '-0.02em', color: 'var(--ink)', textAlign: 'center' }}>This page doesn't exist</h1>
       <p style={{ color: 'var(--ink-2)', fontSize: 14, textAlign: 'center', maxWidth: 320 }}>The link may be broken or the page may have been moved.</p>
@@ -96,6 +112,11 @@ function useOnboardingGate() {
   return state
 }
 
+// Public marketing/legal/content paths — accessible signed-in OR signed-out,
+// and never auto-redirected away (so logged-in users can read pricing/legal).
+const PUBLIC_PATHS = ['/pricing', '/terms', '/privacy', '/refund', '/contact', '/blog', '/glossary']
+const isPublicPath = (p) => PUBLIC_PATHS.some(x => p === x || p.startsWith(x + '/'))
+
 // ─── App routes ───────────────────────────────────────────────────────────────
 
 function AppRoutes() {
@@ -126,6 +147,7 @@ function AppRoutes() {
 
     const path = window.location.pathname
     if (['/sign-in', '/sign-up'].some(p => path.startsWith(p))) return
+    if (isPublicPath(path)) return  // let signed-in users browse public marketing pages
 
     if (!onboarded) {
       if (path !== '/onboarding') navigate('/onboarding', { replace: true })
@@ -146,16 +168,27 @@ function AppRoutes() {
 
   return (
     <ToastProvider>
-      <Routes>
-        {/* ── Public routes — no auth required ── */}
-        <Route path="/" element={isSignedIn ? <Navigate to="/dashboard" replace /> : <Landing/>}/>
-        <Route path="/sign-in/*" element={<SignInPage/>}/>
-        <Route path="/sign-up/*" element={<SignUpPage/>}/>
+      <Suspense fallback={<CheckingScreen/>}>
+        <Routes>
+          {/* ── Public routes — no auth required ── */}
+          <Route path="/" element={isSignedIn ? <Navigate to="/dashboard" replace /> : <Landing/>}/>
+          <Route path="/sign-in/*" element={<SignInPage/>}/>
+          <Route path="/sign-up/*" element={<SignUpPage/>}/>
 
-        {/* ── Auth required ── */}
-        {isSignedIn && (
-          <>
-            <Route path="/onboarding" element={<Onboarding/>}/>
+          {/* ── Public marketing / legal / content (indexable) ── */}
+          <Route path="/pricing"        element={<Pricing/>}/>
+          <Route path="/terms"          element={<Terms/>}/>
+          <Route path="/privacy"        element={<Privacy/>}/>
+          <Route path="/refund"         element={<Refund/>}/>
+          <Route path="/contact"        element={<Contact/>}/>
+          <Route path="/blog"           element={<Blog/>}/>
+          <Route path="/blog/:slug"     element={<BlogPost/>}/>
+          <Route path="/glossary"       element={<Glossary/>}/>
+          <Route path="/glossary/:slug" element={<GlossaryTerm/>}/>
+
+          {/* ── Auth required ── */}
+          {isSignedIn && <Route path="/onboarding" element={<Onboarding/>}/>}
+          {isSignedIn && (
             <Route element={<Layout/>}>
               <Route path="/dashboard" element={<Dashboard/>}/>
               <Route path="/studio"    element={<ScriptStudio/>}/>
@@ -167,12 +200,12 @@ function AppRoutes() {
               <Route path="/plans/success" element={<PlanSuccess/>}/>
               <Route path="/admin"     element={<Admin/>}/>
             </Route>
-          </>
-        )}
+          )}
 
-        {/* Catch-all → 404 */}
-        <Route path="*" element={<NotFound/>}/>
-      </Routes>
+          {/* Catch-all → 404 */}
+          <Route path="*" element={<NotFound/>}/>
+        </Routes>
+      </Suspense>
     </ToastProvider>
   )
 }

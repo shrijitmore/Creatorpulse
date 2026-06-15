@@ -3,14 +3,94 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <title>Influensa: your AI cofounder for content</title>
-  <meta name="description" content="AI-powered content intelligence for solo creators. Discover viral trends, generate scripts that sound like you." />
 
-  <!-- Geist + Geist Mono -->
+  <!-- ── Primary meta ── -->
+  <title>Influensa — AI content intelligence for creators</title>
+  <meta name="description" content="Influensa is your AI cofounder for content. Discover viral trends across YouTube and Reddit, then generate scripts that sound like you — in 60 seconds." />
+  <meta name="keywords" content="AI content tools, content creator software, viral trend finder, AI script generator, YouTube trends, Reddit trends, reels script writer, creator SaaS" />
+  <meta name="author" content="Influensa" />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+  <meta name="theme-color" content="#0A0A0A" />
+  <link rel="canonical" href="https://influensa.xyz/" />
+
+  <!-- Search Console verification — uncomment + paste the token from each console.
+       (Alternatively use the DNS TXT method, which covers the whole domain.) -->
+  <!-- <meta name="google-site-verification" content="YOUR_GOOGLE_TOKEN" /> -->
+  <!-- <meta name="msvalidate.01" content="YOUR_BING_TOKEN" /> -->
+  <!-- IndexNow key file lives at /<key>.txt in public/ (see .indexnow-key). -->
+  <link rel="alternate" hreflang="en" href="https://influensa.xyz/" />
+  <link rel="alternate" hreflang="x-default" href="https://influensa.xyz/" />
+
+  <!-- ── Icons / PWA ── -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/site.webmanifest" />
+
+  <!-- ── Open Graph (Facebook, LinkedIn, WhatsApp) ── -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Influensa" />
+  <meta property="og:title" content="Influensa — AI content intelligence for creators" />
+  <meta property="og:description" content="Discover viral trends across YouTube and Reddit, then generate scripts that sound like you — in 60 seconds." />
+  <meta property="og:url" content="https://influensa.xyz/" />
+  <meta property="og:image" content="https://influensa.xyz/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Influensa — your AI cofounder for content" />
+  <meta property="og:locale" content="en_US" />
+
+  <!-- ── Twitter / X ── -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Influensa — AI content intelligence for creators" />
+  <meta name="twitter:description" content="Discover viral trends across YouTube and Reddit, then generate scripts that sound like you — in 60 seconds." />
+  <meta name="twitter:image" content="https://influensa.xyz/og-image.png" />
+  <meta name="twitter:image:alt" content="Influensa — your AI cofounder for content" />
+
+  <!-- ── Performance hints ── -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- ── Structured data (Organization + WebSite + SoftwareApplication) ── -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://influensa.xyz/#organization",
+        "name": "Influensa",
+        "url": "https://influensa.xyz/",
+        "logo": "https://influensa.xyz/icon-512.png",
+        "description": "AI content intelligence platform for creators.",
+        "sameAs": []
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://influensa.xyz/#website",
+        "url": "https://influensa.xyz/",
+        "name": "Influensa",
+        "publisher": { "@id": "https://influensa.xyz/#organization" },
+        "inLanguage": "en"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "name": "Influensa",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "url": "https://influensa.xyz/",
+        "description": "Discover viral trends across YouTube and Reddit and generate scripts that sound like you, in 60 seconds.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "INR",
+          "description": "Free tier available"
+        },
+        "publisher": { "@id": "https://influensa.xyz/#organization" }
+      }
+    ]
+  }
+  </script>
 </head>
 <body>
   <div id="root"></div>

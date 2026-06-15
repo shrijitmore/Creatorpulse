@@ -1,13 +1,16 @@
 import React from 'react'
 import { SignIn } from '@clerk/clerk-react'
+import BrandLogo from '../components/BrandLogo.jsx'
+import Seo from '../components/Seo.jsx'
 
 export default function SignInPage() {
   return (
     <div className="auth">
+      <Seo title="Sign in · Influensa" path="/sign-in" noindex />
       <div className="auth-grid">
         {/* Left rail */}
         <div className="auth-side">
-          <a className="brand" href="/"><span className="mark"/>Influensa</a>
+          <BrandLogo variant="light" height={26} />
           <div className="auth-quote">
             <p>"The difference between creators who grow and creators who plateau is knowing what to make before they make it."</p>
             <div className="row" style={{ gap: 12, marginTop: 28 }}>

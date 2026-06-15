@@ -1,1 +1,5 @@
+# Canonicalize www → apex (host-level platforms: Netlify / Cloudflare Pages)
+https://www.influensa.xyz/*  https://influensa.xyz/:splat  301!
+
+# SPA fallback — every non-asset path serves the app shell
 /*    /index.html   200

@@ -1,0 +1,40 @@
+# Influensa — https://influensa.xyz
+# Public marketing surface is crawlable; the authenticated app is not.
+
+User-agent: *
+Allow: /$
+Allow: /pricing
+Allow: /blog
+Allow: /glossary
+Allow: /terms
+Allow: /privacy
+Allow: /refund
+Allow: /contact
+Allow: /og-image.png
+Disallow: /dashboard
+Disallow: /studio
+Disallow: /saved
+Disallow: /profile
+Disallow: /settings
+Disallow: /plans
+Disallow: /checkout
+Disallow: /admin
+Disallow: /onboarding
+Disallow: /sign-in
+Disallow: /sign-up
+Disallow: /api/
+
+# AI crawlers are explicitly welcome (discoverability in AI Overviews / ChatGPT / Perplexity)
+User-agent: GPTBot
+Allow: /
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /api/
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://influensa.xyz/sitemap.xml
