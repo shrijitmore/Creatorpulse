@@ -80,12 +80,16 @@ function useOnboardingGate() {
 
     let cancelled = false
 
-    getToken()
-      .then(token => {
+    // Fetch onboarding status with a few retries. A bare token may not be ready on
+    // the first tick after Clerk loads, and the global API token getter is set in a
+    // sibling effect whose order isn't guaranteed — so we register it here first to
+    // avoid a 401 that would wrongly latch "not onboarded" and bounce to onboarding.
+    const resolveStatus = async (attempt = 0) => {
+      try {
+        const token = await getToken()
         if (!token) throw new Error('No token yet')
-        return getOnboardingStatus()
-      })
-      .then(d => {
+        setTokenGetter(() => getToken()) // ensure authed api calls before we fetch
+        const d = await getOnboardingStatus()
         if (cancelled) return
         resolvedRef.current = true
         if (d.completed) {
@@ -98,14 +102,22 @@ function useOnboardingGate() {
         } else {
           setState({ checking: false, onboarded: false })
         }
-      })
-      .catch(() => {
+      } catch (err) {
         if (cancelled) return
+        // Transient (token not ready / network) — retry before giving up, so we
+        // never wrongly force a completed user back through onboarding.
+        if (attempt < 4) {
+          setTimeout(() => { if (!cancelled) resolveStatus(attempt + 1) }, 600)
+          return
+        }
         resolvedRef.current = true
         const local = localStorage.getItem('trendforge_niches')
         const hasLocal = (() => { try { const p = JSON.parse(local || '[]'); return Array.isArray(p) && p.length > 0 } catch { return false } })()
         setState({ checking: false, onboarded: hasLocal })
-      })
+      }
+    }
+
+    resolveStatus()
 
     return () => { cancelled = true }
   }, [isSignedIn, isLoaded])

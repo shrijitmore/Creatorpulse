@@ -11,6 +11,7 @@ export const PLATFORM_FILTER_OPTS = [
   { id: 'all',       label: 'All' },
   { id: 'reddit',    label: 'Reddit' },
   { id: 'youtube',   label: 'YouTube' },
+  { id: 'news',      label: 'News' },
 ]
 
 export const CONTENT_FORMATS = [

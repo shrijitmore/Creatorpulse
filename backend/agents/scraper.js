@@ -29,15 +29,19 @@ async function fetchYouTubeSearch(url, niche) {
     const res = await fetch(url, { signal: AbortSignal.timeout(10000) })
     if (res.ok) return res
 
-    let reason = ''
-    try { const e = await res.clone().json(); reason = e.error?.errors?.[0]?.reason || e.error?.status || '' } catch {}
+    let reason = '', message = ''
+    try { const e = await res.clone().json(); reason = e.error?.errors?.[0]?.reason || e.error?.status || ''; message = e.error?.message || '' } catch {}
 
-    const transient = res.status === 429 && reason !== 'quotaExceeded'
+    // YouTube returns reason="rateLimitExceeded" for BOTH the short burst limit AND
+    // the daily quota cap (message says "...per day"). Only the burst limit is worth
+    // retrying — retrying a daily cap just wastes the (already 0) remaining quota.
+    const isDailyQuota = reason === 'quotaExceeded' || /per day|quota exceeded/i.test(message)
+    const transient = res.status === 429 && !isDailyQuota
     if (transient && attempt < YT_RETRY.max) {
       await sleep(YT_RETRY.baseDelayMs * (attempt + 1))
       continue
     }
-    logger.warn('scraper.youtube_http_error', { niche, status: res.status, reason })
+    logger.warn('scraper.youtube_http_error', { niche, status: res.status, reason, dailyQuota: isDailyQuota })
     return null
   }
 }
@@ -49,16 +53,19 @@ export async function scrapeTrends(niches, platforms, userCtx = {}) {
   const targetPlatforms = platforms?.length > 0 ? platforms.filter(p => p !== 'x') : ['reddit', 'youtube']
   const results = []
 
-  // Run all scrapers in parallel
+  // Run all scrapers in parallel. Google News is keyless/auth-free so the feed
+  // still fills when YouTube quota is spent or Reddit is blocked.
   await Promise.all([
     scrapeYouTube(activeNiches, targetPlatforms, results, userCtx),
     scrapeReddit(activeNiches, targetPlatforms, results),
+    scrapeGoogleNews(activeNiches, results),
   ])
 
   logger.info('scraper.total', {
     total:   results.length,
     youtube: results.filter(r => r.platform === 'youtube').length,
     reddit:  results.filter(r => r.platform === 'reddit').length,
+    news:    results.filter(r => r.platform === 'news').length,
   })
   return results
 }
@@ -123,18 +130,70 @@ async function scrapeYouTube(niches, platforms, results, userCtx = {}) {
 }
 
 // ── Reddit ────────────────────────────────────────────────────────────────────
+// Reddit blocks anonymous .json (403). With app credentials we use the OAuth
+// app-only (client_credentials) flow against oauth.reddit.com. A descriptive,
+// unique User-Agent is mandatory or Reddit 429/403s regardless of the token.
+
+// Reddit requires a unique UA in the format: <platform>:<app id>:<version> (by /u/<user>)
+const REDDIT_UA = process.env.REDDIT_USER_AGENT || 'web:influensa:1.0 (by /u/influensa_app)'
+let redditTokenCache = { token: null, expiresAt: 0 }
+
+async function getRedditToken() {
+  const id = process.env.REDDIT_CLIENT_ID
+  const secret = process.env.REDDIT_CLIENT_SECRET
+  if (!id || !secret) return null // not configured — caller falls back to other sources
+
+  if (redditTokenCache.token && Date.now() < redditTokenCache.expiresAt) {
+    return redditTokenCache.token
+  }
+
+  try {
+    const basic = Buffer.from(`${id}:${secret}`).toString('base64')
+    const res = await fetch('https://www.reddit.com/api/v1/access_token', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${basic}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': REDDIT_UA,
+      },
+      body: 'grant_type=client_credentials',
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!res.ok) {
+      logger.warn('scraper.reddit_auth_error', { status: res.status })
+      return null
+    }
+    const data = await res.json()
+    if (!data.access_token) return null
+    // Cache until ~1 min before expiry (Reddit tokens last ~1h).
+    redditTokenCache = { token: data.access_token, expiresAt: Date.now() + ((data.expires_in || 3600) - 60) * 1000 }
+    return data.access_token
+  } catch (err) {
+    logger.warn('scraper.reddit_auth_error', { message: err.message })
+    return null
+  }
+}
 
 async function scrapeReddit(niches, platforms, results) {
   let rdCount = 0
 
+  // App-only OAuth token. If unavailable (no creds / auth fail), skip Reddit —
+  // anonymous .json is 403-blocked, and Google News already covers the feed.
+  const token = await getRedditToken()
+  if (!token) {
+    logger.info('scraper.reddit_skipped', { reason: 'no_oauth_token' })
+    return
+  }
+  const authHeaders = { 'Authorization': `Bearer ${token}`, 'User-Agent': REDDIT_UA }
+
   await Promise.all(niches.slice(0, 5).map(async niche => {
     try {
       const [searchRes, subRes] = await Promise.all([
-        fetch(`https://www.reddit.com/search.json?q=${encodeURIComponent(niche)}&sort=top&limit=8&type=link&t=week`, {
-          headers: { 'User-Agent': 'Influensa/1.0' }, signal: AbortSignal.timeout(10000)
+        fetch(`https://oauth.reddit.com/search?q=${encodeURIComponent(niche)}&sort=top&limit=8&type=link&t=week`, {
+          headers: authHeaders, signal: AbortSignal.timeout(10000)
         }),
-        fetch(`https://www.reddit.com/r/${(NICHE_SUBREDDITS[niche] || [niche])[0]}/hot.json?limit=5`, {
-          headers: { 'User-Agent': 'Influensa/1.0' }, signal: AbortSignal.timeout(8000)
+        fetch(`https://oauth.reddit.com/r/${(NICHE_SUBREDDITS[niche] || [niche])[0]}/hot?limit=5`, {
+          headers: authHeaders, signal: AbortSignal.timeout(8000)
         })
       ])
 
@@ -187,4 +246,83 @@ async function scrapeReddit(niches, platforms, results) {
   }))
 
   logger.info('scraper.reddit_done', { count: rdCount })
+}
+
+// ── Google News RSS ───────────────────────────────────────────────────────────
+// Keyless, auth-free fallback so the feed survives when YouTube quota is spent or
+// Reddit is blocked. Returns recent news headlines per niche, scored by recency.
+
+const NEWS_MAX_PER_NICHE = 8
+const NEWS_NICHE_CAP = 6 // niches per run (keep total HTTP fan-out modest)
+
+function decodeEntities(s = '') {
+  return s
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&#x27;/g, "'")
+    .replace(/&apos;/g, "'").replace(/&nbsp;/g, ' ')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
+    .trim()
+}
+
+// Score a headline purely by recency (no engagement signal exists for news).
+function newsScoreAndSignal(ageHours) {
+  if (ageHours <= 6)  return { score: 82, signal: 'viral'  }
+  if (ageHours <= 24) return { score: 64, signal: 'rising' }
+  if (ageHours <= 72) return { score: 48, signal: 'new'    }
+  return { score: 38, signal: 'new' }
+}
+
+async function scrapeGoogleNews(niches, results) {
+  let newsCount = 0
+
+  await Promise.all(niches.slice(0, NEWS_NICHE_CAP).map(async niche => {
+    try {
+      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(niche)}&hl=en-US&gl=US&ceid=US:en`
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; InfluensaBot/1.0)' },
+        signal: AbortSignal.timeout(10000),
+      })
+      if (!res.ok) {
+        logger.warn('scraper.news_http_error', { niche, status: res.status })
+        return
+      }
+
+      const xml = await res.text()
+      const items = xml.split('<item>').slice(1, NEWS_MAX_PER_NICHE + 1)
+
+      for (const item of items) {
+        const rawTitle = item.match(/<title>([\s\S]*?)<\/title>/)?.[1] || ''
+        const pubDate = item.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] || ''
+        const source = item.match(/<source[^>]*>([\s\S]*?)<\/source>/)?.[1] || ''
+        const title = decodeEntities(rawTitle.replace(/<!\[CDATA\[|\]\]>/g, ''))
+        if (!title || title.length < 12) continue
+
+        // Google News titles are "Headline - Publisher" — strip the trailing source.
+        const publisher = decodeEntities(source)
+        const headline = publisher && title.endsWith(`- ${publisher}`)
+          ? title.slice(0, -(publisher.length + 2)).trim()
+          : title
+
+        const published = pubDate ? new Date(pubDate) : new Date()
+        const ageHours = (Date.now() - published.getTime()) / 3600000
+        const { score, signal } = newsScoreAndSignal(ageHours)
+
+        results.push({
+          id: crypto.randomUUID(),
+          title: headline.slice(0, 100),
+          platform: 'news',
+          signal,
+          summary: `${publisher || 'Google News'} — ${ageHours < 24 ? `${Math.max(1, Math.round(ageHours))}h ago` : `${Math.round(ageHours / 24)}d ago`}`,
+          score,
+          niche,
+          createdAt: published.toISOString(),
+        })
+        newsCount++
+      }
+    } catch (err) {
+      logger.error('scraper.news_error', { niche, message: err.message })
+    }
+  }))
+
+  logger.info('scraper.news_done', { count: newsCount })
 }
