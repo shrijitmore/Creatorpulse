@@ -191,7 +191,9 @@ export default function SavedScripts() {
   }, [])
 
   const handleOpen = useCallback((script) => {
-    navigate(`/studio?topicId=${script.topicId || script.id}&title=${encodeURIComponent(script.topicTitle)}&niche=${encodeURIComponent(script.niche || '')}`)
+    // Open the SAVED script by id so the studio loads it from the DB instead of
+    // regenerating from the topic. title/niche kept for the header before it loads.
+    navigate(`/studio?scriptId=${script.id}&title=${encodeURIComponent(script.topicTitle)}&niche=${encodeURIComponent(script.niche || '')}`)
   }, [navigate])
 
   const filtered = useMemo(() => {

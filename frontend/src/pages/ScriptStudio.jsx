@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useScriptGeneration } from '../hooks/useScriptGeneration.js'
-import { getMemorySummary } from '../lib/api.js'
+import { getMemorySummary, getScript } from '../lib/api.js'
 import SceneEditModal from '../features/studio/SceneEditModal.jsx'
 import RecordingStudio from '../features/studio/RecordingStudio.jsx'
 import ScriptDiff from '../features/studio/ScriptDiff.jsx'
@@ -298,6 +298,7 @@ export default function ScriptStudio() {
   const navigate = useNavigate()
 
   const topicId    = searchParams.get('topicId') || ''
+  const scriptId   = searchParams.get('scriptId') || ''  // set when opening a saved script from the library
   const topicTitle = searchParams.get('title') ? decodeURIComponent(searchParams.get('title')) : ''
   const topicNiche = searchParams.get('niche') ? decodeURIComponent(searchParams.get('niche')) : 'general'
 
@@ -308,9 +309,12 @@ export default function ScriptStudio() {
   const [diffOpen, setDiffOpen] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
   const [localScript, setLocalScript] = useState(null)
+  const [localKit, setLocalKit] = useState(null)
+  const [loadingSaved, setLoadingSaved] = useState(!!scriptId)
 
-  const { isGenerating, steps, script: generatedScript, contentKit, error, regenerating, generate, cancelGeneration, regenerateContentSection } = useScriptGeneration(topicId)
+  const { isGenerating, steps, script: generatedScript, contentKit: generatedKit, error, regenerating, generate, cancelGeneration, regenerateContentSection } = useScriptGeneration(topicId)
   const script = localScript || generatedScript
+  const contentKit = localKit || generatedKit
 
   const handleApplyEdit = ({ element, suggestion, scene, cascading }) => {
     setLocalScript(prev => {
@@ -336,10 +340,28 @@ export default function ScriptStudio() {
   }
 
   useEffect(() => {
+    // Opening a saved script from the library — load it from the DB instead of
+    // re-running the whole generation pipeline (which is what was happening before).
+    if (scriptId) {
+      let cancelled = false
+      getScript(scriptId)
+        .then(data => {
+          if (cancelled || !data) return
+          const { contentKit: kit, ...scriptData } = data
+          setLocalScript(scriptData)
+          setLocalKit(kit || null)
+          if (scriptData.tone) setTone(scriptData.tone.charAt(0).toUpperCase() + scriptData.tone.slice(1))
+          if (scriptData.format) setFormat(scriptData.format)
+        })
+        .catch(() => {})
+        .finally(() => { if (!cancelled) setLoadingSaved(false) })
+      return () => { cancelled = true }
+    }
+    // Fresh topic from the dashboard — generate.
     if (topicId && !script && !isGenerating) generate(topicId, topicTitle, topicNiche, tone.toLowerCase(), format)
   }, [])
 
-  if (!topicId && !script) {
+  if (!topicId && !scriptId && !script) {
     return (
       <div className="app-main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 56px)' }}>
         <div style={{ textAlign: 'center', maxWidth: 360 }}>
@@ -431,6 +453,13 @@ export default function ScriptStudio() {
           <div style={{ display: 'grid', gap: 24, gridTemplateColumns: '1fr', alignContent: 'start' }}>
             <ContentKit contentKit={contentKit} regenerating={regenerating} onRegenerate={regenerateContentSection}/>
             <MemorySidebar niche={topicNiche}/>
+          </div>
+        </div>
+      ) : loadingSaved ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 320 }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ display: 'inline-flex', gap: 4, marginBottom: 12 }}><span className="tdot"/><span className="tdot"/><span className="tdot"/></div>
+            <p className="body">Loading your saved script…</p>
           </div>
         </div>
       ) : !isGenerating ? (
